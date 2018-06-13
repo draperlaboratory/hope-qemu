@@ -28,8 +28,12 @@
 
 #include "exec/translator.h"
 #include "exec/log.h"
+#include "qemu-options.h"
+#include "sysemu/sysemu.h"
 
 #include "instmap.h"
+
+#include "policy_validator.h"
 
 /* global register indices */
 static TCGv cpu_gpr[32], cpu_pc;
@@ -81,6 +85,29 @@ static const int tcg_memop_lookup[8] = {
 static inline bool has_ext(DisasContext *ctx, uint32_t ext)
 {
     return ctx->misa & ext;
+}
+
+//Policy validator functions that are dependent on target length
+void policy_validator_set_callbacks(target_ulong (*reg_reader)(uint32_t),
+                                    target_ulong (*mem_reader)(target_ulong));
+bool policy_validator_validate(target_ulong pc, uint32_t insn);
+
+bool policy_validator_validate(target_ulong pc, uint32_t insn)
+{
+#ifdef ENABLE_VALIDATOR
+    if (policy_validator_enabled())
+        return e_v_validate(pc, insn);
+#endif
+    return true;
+}
+
+void policy_validator_set_callbacks(target_ulong (*reg_reader)(uint32_t),
+                                    target_ulong (*mem_reader)(target_ulong))
+{
+#ifdef ENABLE_VALIDATOR
+    if (policy_validator_enabled())
+        e_v_set_callbacks(reg_reader, mem_reader);
+#endif
 }
 
 static void generate_exception(DisasContext *ctx, int excp)
@@ -807,7 +834,18 @@ static void riscv_tr_translate_insn(DisasContextBase *dcbase, CPUState *cpu)
     CPURISCVState *env = cpu->env_ptr;
     uint16_t opcode16 = translator_lduw(env, ctx->base.pc_next);
 
-    decode_opc(env, ctx, opcode16);
+    ctx->opcode = cpu_ldl_code(env, ctx->base.pc_next);
+
+    uint32_t pc = ctx->base.pc_next;
+    if(pc != 0x1000 && pc != 0x1004) { //reset ROM
+        if(!policy_validator_validate(pc, ctx->opcode)) {
+            qemu_log("Validator Validation Failed at PC=0x%x\n", pc);
+            exit(1);
+        }
+        policy_validator_commit();
+    }
+
+    decode_opc(ctx);
     ctx->base.pc_next = ctx->pc_succ_insn;
 
     if (ctx->base.is_jmp == DISAS_NEXT) {
@@ -866,6 +904,26 @@ void gen_intermediate_code(CPUState *cs, TranslationBlock *tb, int max_insns)
     translator_loop(&riscv_tr_ops, &ctx.base, cs, tb, max_insns);
 }
 
+
+static inline target_ulong policy_validator_reg_reader(uint32_t reg_num)
+#if TARGET_LONG_BITS == 32
+{
+    if(reg_num == 0) return 0;
+
+    TCGTemp *a = tcgv_i32_temp(cpu_gpr[reg_num]);
+    return a->val;
+}
+#elif TARGET_LONG_BITS == 64
+{
+    if(reg_num == 0) return 0;
+
+    TCGTemp *a = tcgv_i64_temp(cpu_gpr[reg_num]);
+    return a->val;
+}
+#else
+#error unsupported
+#endif
+
 void riscv_translate_init(void)
 {
     int i;
@@ -890,4 +948,7 @@ void riscv_translate_init(void)
                              "load_res");
     load_val = tcg_global_mem_new(cpu_env, offsetof(CPURISCVState, load_val),
                              "load_val");
+
+    set_policy_validator_metadata();
+    policy_validator_set_callbacks(policy_validator_reg_reader, NULL);
 }
