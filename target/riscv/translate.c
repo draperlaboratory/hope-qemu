@@ -839,7 +839,11 @@ static void riscv_tr_translate_insn(DisasContextBase *dcbase, CPUState *cpu)
     uint32_t pc = ctx->base.pc_next;
     if(pc != 0x1000 && pc != 0x1004) { //reset ROM
         if(!policy_validator_validate(pc, ctx->opcode)) {
-            qemu_log("Validator Validation Failed at PC=0x%x\n", pc);
+            char *msg = g_malloc(1024);
+            policy_validator_violation_msg(msg, 1024);
+            qemu_log("%s", msg);
+            qemu_log("MSG: End test.\n");
+            g_free(msg);
             exit(1);
         }
         policy_validator_commit();
