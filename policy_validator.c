@@ -53,3 +53,10 @@ bool policy_validator_commit(void)
 #endif
     return true;
 }
+
+void policy_validator_violation_msg(char* dest, int n)
+{
+#ifdef ENABLE_VALIDATOR
+    e_v_violation_msg(dest, n);
+#endif
+}
