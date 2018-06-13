@@ -114,6 +114,8 @@
 #include "sysemu/iothread.h"
 #include "qemu/guest-random.h"
 
+#include "policy_validator.h"
+
 #define MAX_VIRTIO_CONSOLES 1
 
 static const char *data_dir[16];
@@ -500,6 +502,25 @@ static QemuOptsList qemu_fw_cfg_opts = {
             .type = QEMU_OPT_STRING,
             .help = "Sets id of the object generating the fw_cfg blob "
                     "to be inserted",
+        },
+        { /* end of list */ }
+    },
+};
+
+static QemuOptsList qemu_policy_validator_cfg_opts = {
+    .name = "policy-validator-cfg",
+    .implied_opt_name = "enable",
+    .head = QTAILQ_HEAD_INITIALIZER(qemu_policy_validator_cfg_opts.head),
+    .desc = {
+        {
+            .name = "enable",
+            .type = QEMU_OPT_BOOL,
+        }, {
+            .name = "policy-path",
+            .type = QEMU_OPT_STRING,
+        }, {
+            .name = "tag-info-file",
+            .type = QEMU_OPT_STRING,
         },
         { /* end of list */ }
     },
@@ -2921,6 +2942,7 @@ void qemu_init(int argc, char **argv, char **envp)
     qemu_add_opts(&qemu_icount_opts);
     qemu_add_opts(&qemu_semihosting_config_opts);
     qemu_add_opts(&qemu_fw_cfg_opts);
+    qemu_add_opts(&qemu_policy_validator_cfg_opts);
     module_call_init(MODULE_INIT_OPTS);
 
     runstate_init();
@@ -3797,6 +3819,18 @@ void qemu_init(int argc, char **argv, char **envp)
                 break;
             case QEMU_OPTION_enable_sync_profile:
                 qsp_enable();
+                break;
+            case QEMU_OPTION_policy_validator_cfg:
+                opts = qemu_opts_parse_noisily(qemu_find_opts("policy-validator-cfg"),
+                                               optarg, true);
+
+                if (opts != NULL) {
+                    set_policy_validator_enabled(qemu_opt_get_bool(opts, "enable",
+                                                                   true));
+
+                    set_policy_validator_policy_path(qemu_opt_get(opts, "policy-path"));
+                    set_policy_validator_tag_info_file(qemu_opt_get(opts, "tag-info-file"));
+                }
                 break;
             case QEMU_OPTION_nouserconfig:
                 /* Nothing to be parsed here. Especially, do not error out below. */

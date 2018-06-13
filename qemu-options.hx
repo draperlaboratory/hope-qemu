@@ -5097,5 +5097,14 @@ SRST
             (qemu) qom-set /objects/iothread1 poll-max-ns 100000
 ERST
 
+DEF("policy-validator-cfg", HAS_ARG, QEMU_OPTION_policy_validator_cfg,
+    "-policy-validator-cfg policy-path=<dir>,tag-info-file=<file>\n"
+    "                setup the policy <dir> and tag-info-file <file> for policy metadata.\n",
+    QEMU_ARCH_RISCV)
+STEXI
+@item -policy-validator-cfg policy-path=@var{dir},tag-info-file=@var{file}
+@findex -policy-validator-cfg
+Policy dir and metadata tag info file.
+ETEXI
 
 HXCOMM This is the last statement. Insert new options before this line!
