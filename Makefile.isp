@@ -1,0 +1,19 @@
+.PHONY: all
+.PHONY: install
+.PHONY: clean
+
+ISP_PREFIX ?= /opt/isp/
+
+all: build/Makefile
+	$(MAKE) -C build
+
+build/Makefile:
+	$(MAKE) clean
+	mkdir build
+	cd build; ../configure --target-list=riscv32-linux-user,riscv32-softmmu,riscv64-linux-user,riscv64-softmmu --with-validator-lib=$(ISP_PREFIX)/lib --with-validator-include=$(ISP_PREFIX)/include --prefix=$(ISP_PREFIX)
+
+install:
+	$(MAKE) -C build install
+
+clean:
+	$(RM) -r build
