@@ -463,6 +463,9 @@ supported_os="no"
 bogus_os="no"
 malloc_trim=""
 
+validator_include=""
+validator_lib=""
+
 # parse CC options first
 for opt do
   optarg=$(expr "x$opt" : 'x[^=]*=\(.*\)')
@@ -1382,6 +1385,10 @@ for opt do
   ;;
   --disable-git-update) git_update=no
   ;;
+  --with-validator-lib=*) validator_lib="$optarg"
+  ;;
+  --with-validator-include=*) validator_include="$optarg"
+  ;;
   *)
       echo "ERROR: unknown option $opt"
       echo "Try '$0 --help' for more information"
@@ -1389,6 +1396,14 @@ for opt do
   ;;
   esac
 done
+
+if test "${validator_lib+set}" = set; then :
+   QEMU_LDFLAGS="-L$validator_lib -lrv32-renode-validator $QEMU_LDFLAGS"
+fi
+
+if test "${validator_include+set}" = set; then :
+   QEMU_CFLAGS="-I$validator_include $QEMU_CFLAGS"
+fi
 
 if test "$vhost_user" = ""; then
     if test "$mingw32" = "yes"; then
@@ -1555,6 +1570,9 @@ Advanced options (experts only):
                            xen pv domain builder
   --enable-debug-stack-usage
                            track the maximum stack usage of stacks created by qemu_alloc_stack
+
+  --with-validator-lib     Set the external tag validator library path
+  --with-validator-include Set the external tag validator include path
 
 Optional features, enabled with --enable-FEATURE and
 disabled with --disable-FEATURE, default is enabled if available:
@@ -7158,6 +7176,13 @@ fi
 if test "$TARGET_ARCH" = "s390x" -a "$target_softmmu" = "yes"  -a "$ARCH" = "s390x" -a "$kvm" = "yes"; then
     if ld_has --s390-pgste ; then
         ldflags="-Wl,--s390-pgste $ldflags"
+    fi
+fi
+
+# Currently the external validator only supports riscv32
+if test "$target_name" = "riscv32"; then :
+    if test "${validator_include+set}" = set; then :
+        cflags="-DENABLE_VALIDATOR $cflags"
     fi
 fi
 
