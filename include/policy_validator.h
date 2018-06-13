@@ -26,4 +26,6 @@ const char* get_policy_validator_tag_info_file(void);
 void set_policy_validator_metadata(void);
 bool policy_validator_commit(void);
 
+void policy_validator_violation_msg(char* dest, int n);
+
 #endif /* POLICY_VALIDATOR_H */
