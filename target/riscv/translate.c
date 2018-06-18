@@ -862,9 +862,13 @@ static void riscv_tr_translate_insn(DisasContextBase *dcbase, CPUState *cpu)
     }
 }
 
+static CPURISCVState* policy_validator_hack_env;
+
 static void riscv_tr_tb_stop(DisasContextBase *dcbase, CPUState *cpu)
 {
     DisasContext *ctx = container_of(dcbase, DisasContext, base);
+
+    policy_validator_hack_env = cpu->env_ptr;
 
     switch (ctx->base.is_jmp) {
     case DISAS_TOO_MANY:
@@ -874,6 +878,21 @@ static void riscv_tr_tb_stop(DisasContextBase *dcbase, CPUState *cpu)
         break;
     default:
         g_assert_not_reached();
+    }
+
+    uint32_t pc = ctx->base.pc_first;
+
+    if(pc != 0x1000 && pc != 0x1004) { //reset ROM
+        if(!policy_validator_validate(pc, ctx->opcode)) {
+            char *msg = g_malloc(1024);
+            policy_validator_violation_msg(msg, 1024);
+            qemu_log("%s", msg);
+            qemu_log("MSG: End test.\n");
+            g_free(msg);
+            exit(1);
+        }
+        policy_validator_commit();
+        qemu_log("Finished validation for pc = 0x%x\n", pc);
     }
 }
 
@@ -910,23 +929,11 @@ void gen_intermediate_code(CPUState *cs, TranslationBlock *tb, int max_insns)
 
 
 static inline target_ulong policy_validator_reg_reader(uint32_t reg_num)
-#if TARGET_LONG_BITS == 32
 {
     if(reg_num == 0) return 0;
 
-    TCGTemp *a = tcgv_i32_temp(cpu_gpr[reg_num]);
-    return a->val;
+    return policy_validator_hack_env->gpr[reg_num];
 }
-#elif TARGET_LONG_BITS == 64
-{
-    if(reg_num == 0) return 0;
-
-    TCGTemp *a = tcgv_i64_temp(cpu_gpr[reg_num]);
-    return a->val;
-}
-#else
-#error unsupported
-#endif
 
 void riscv_translate_init(void)
 {
