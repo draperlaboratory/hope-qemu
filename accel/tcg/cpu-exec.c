@@ -35,6 +35,7 @@
 #endif
 #include "sysemu/cpus.h"
 #include "sysemu/replay.h"
+#include "policy_validator.h"
 
 /* -icount align implementation. */
 
@@ -388,7 +389,7 @@ static inline TranslationBlock *tb_find(CPUState *cpu,
     bool acquired_tb_lock = false;
 
     tb = tb_lookup__cpu_state(cpu, &pc, &cs_base, &flags, cf_mask);
-    if (tb == NULL) {
+    if (tb == NULL || policy_validator_enabled()) {
         /* mmap_lock is needed by tb_gen_code, and mmap_lock must be
          * taken outside tb_lock. As system emulation is currently
          * single threaded the locks are NOPs.
@@ -401,7 +402,7 @@ static inline TranslationBlock *tb_find(CPUState *cpu,
          * taking the locks so we check again inside the lock.
          */
         tb = tb_htable_lookup(cpu, pc, cs_base, flags, cf_mask);
-        if (likely(tb == NULL)) {
+        if (likely(tb == NULL) || policy_validator_enabled()) {
             /* if no translated code available, then translate it now */
             tb = tb_gen_code(cpu, pc, cs_base, flags, cf_mask);
         }
