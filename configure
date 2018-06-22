@@ -1655,14 +1655,6 @@ for opt do
   esac
 done
 
-if test "${validator_lib+set}" = set; then :
-   QEMU_LDFLAGS="-L$validator_lib -lrv32-renode-validator $QEMU_LDFLAGS"
-fi
-
-if test "${validator_include+set}" = set; then :
-   QEMU_CFLAGS="-I$validator_include $QEMU_CFLAGS"
-fi
-
 case "$cpu" in
     ppc)
            CPU_CFLAGS="-m32"
@@ -6837,6 +6829,16 @@ echo_version() {
         echo "($2)"
     fi
 }
+
+if test "${validator_lib+set}" = set; then :
+   QEMU_LDFLAGS="-L$validator_lib $QEMU_LDFLAGS"
+   LIBS="-lrv32-renode-validator $LIBS"
+fi
+
+if test "${validator_include+set}" = set; then :
+   QEMU_CFLAGS="-I$validator_include $QEMU_CFLAGS"
+fi
+
 
 # prepend pixman and ftd flags after all config tests are done
 QEMU_CFLAGS="$pixman_cflags $fdt_cflags $QEMU_CFLAGS"
