@@ -60,3 +60,31 @@ void policy_validator_violation_msg(char* dest, int n)
     e_v_violation_msg(dest, n);
 #endif
 }
+
+void policy_validator_get_pc_tag(char *dest, int n)
+{
+#ifdef ENABLE_VALIDATOR
+    e_v_pc_tag(dest, n);
+#endif
+}
+
+void policy_validator_get_csr_tag(char *dest, int n, uint64_t addr)
+{
+#ifdef ENABLE_VALIDATOR
+    e_v_csr_tag(dest, n, addr);
+#endif
+}
+
+void policy_validator_get_reg_tag(char *dest, int n, uint64_t addr)
+{
+#ifdef ENABLE_VALIDATOR
+    e_v_reg_tag(dest, n, addr);
+#endif
+}
+
+void policy_validator_get_mem_tag(char *dest, int n, uint64_t addr)
+{
+#ifdef ENABLE_VALIDATOR
+    e_v_mem_tag(dest, n, addr);
+#endif
+}
