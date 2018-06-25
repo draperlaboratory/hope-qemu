@@ -27,5 +27,9 @@ void set_policy_validator_metadata(void);
 bool policy_validator_commit(void);
 
 void policy_validator_violation_msg(char* dest, int n);
+void policy_validator_get_pc_tag(char *dest, int n);
+void policy_validator_get_mem_tag(char *dest, int n, uint64_t addr);
+void policy_validator_get_csr_tag(char *dest, int n, uint64_t addr);
+void policy_validator_get_reg_tag(char *dest, int n, uint64_t addr);
 
 #endif /* POLICY_VALIDATOR_H */
