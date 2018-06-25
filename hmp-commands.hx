@@ -1814,3 +1814,68 @@ ERST
         .flags      = "p",
     },
 
+    {
+        .name       = "pvm",
+        .args_type  = "",
+        .params     = "",
+        .help       = "print policy violation message",
+        .cmd        = hmp_pvm,
+    },
+
+SRST
+``pvm``
+Command to print last policy violation info
+Only captures the last violation info.
+ERST
+
+    {
+        .name       = "env-m",
+        .args_type  = "",
+        .params     = "",
+        .help       = "get the env metadata",
+        .cmd        = hmp_env_m,
+    },
+
+SRST
+``env-m`` 
+Command to get the env metadata.
+ERST
+
+    {
+        .name       = "reg-m",
+        .args_type  = "num:i?",
+        .params     = "num",
+        .help       = "dump metadata for register num",
+        .cmd        = hmp_reg_m,
+    },
+
+SRST
+``reg-m`` *num*
+Dump the metadata for register *num*.
+ERST
+
+    {
+        .name       = "csr-m",
+        .args_type  = "num:i?",
+        .params     = "num",
+        .help       = "dump metadata for csr register num",
+        .cmd        = hmp_csr_m,
+    },
+
+SRST
+``csr-m`` *num*
+Dump the metadata for csr register *num*.
+ERST
+
+    {
+        .name       = "mem-m",
+        .args_type  = "addr:i?",
+        .params     = "addr",
+        .help       = "dump metadata for memory addr",
+        .cmd        = hmp_mem_m,
+    },
+
+SRST
+``mem-m`` *addr*
+Dump the metadata for memory at address *addr*.
+ERST
