@@ -1887,6 +1887,20 @@ Command to get the env metadata.
 ETEXI
 
     {
+        .name       = "env-mw",
+        .args_type  = "",
+        .params     = "",
+        .help       = "set watch on the env metadata",
+        .cmd        = hmp_env_mw,
+    },
+
+STEXI
+@item env-mw
+@findex env-mw
+Command to set a watch-point on any change to the env metadata.
+ETEXI
+
+    {
         .name       = "reg-m",
         .args_type  = "num:i?",
         .params     = "num",
@@ -1898,6 +1912,20 @@ STEXI
 @item reg-m @var{num}
 @findex reg-m
 Dump the metadata for register @var{num}.
+ETEXI
+
+    {
+        .name       = "reg-mw",
+        .args_type  = "num:i?",
+        .params     = "num",
+        .help       = "set watch on the metadata for register num",
+        .cmd        = hmp_reg_mw,
+    },
+
+STEXI
+@item reg-mw @var{num}
+@findex reg-mw
+Command to set a watch-point on any change to the metadata for register @var{num}.
 ETEXI
 
     {
@@ -1915,6 +1943,20 @@ Dump the metadata for csr register @var{num}.
 ETEXI
 
     {
+        .name       = "csr-mw",
+        .args_type  = "num:i?",
+        .params     = "num",
+        .help       = "set watch on the metadata for csr register num",
+        .cmd        = hmp_csr_mw,
+    },
+
+STEXI
+@item csr-mw @var{num}
+@findex csr-mw
+Command to set a watchpoint on the metadata for csr register @var{num}.
+ETEXI
+
+    {
         .name       = "mem-m",
         .args_type  = "addr:i?",
         .params     = "addr",
@@ -1926,6 +1968,20 @@ STEXI
 @item mem-m @var{num}
 @findex mem-m
 Dump the metadata for memory at address @var{addr}.
+ETEXI
+
+    {
+        .name       = "mem-mw",
+        .args_type  = "addr:i?",
+        .params     = "addr",
+        .help       = "watch metadata for memory addr",
+        .cmd        = hmp_mem_mw,
+    },
+
+STEXI
+@item mem-mw @var{num}
+@findex mem-mw
+Command to set a watch-point on any change to the metadata for memory at address @var{addr}.
 ETEXI
 
 STEXI
