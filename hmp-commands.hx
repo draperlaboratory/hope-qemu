@@ -1856,6 +1856,20 @@ SRST
 ERST
 
     {
+        .name       = "env-mw",
+        .args_type  = "",
+        .params     = "",
+        .help       = "set watch on the env metadata",
+        .cmd        = hmp_env_mw,
+    },
+
+STEXI
+@item env-mw
+@findex env-mw
+Command to set a watch-point on any change to the env metadata.
+ETEXI
+
+    {
         .name       = "reg-m",
         .args_type  = "num:i?",
         .params     = "num",
@@ -1867,6 +1881,20 @@ SRST
 ``reg-m`` *num*
   Dump the metadata for register *num*
 ERST
+
+    {
+        .name       = "reg-mw",
+        .args_type  = "num:i?",
+        .params     = "num",
+        .help       = "set watch on the metadata for register num",
+        .cmd        = hmp_reg_mw,
+    },
+
+STEXI
+@item reg-mw @var{num}
+@findex reg-mw
+Command to set a watch-point on any change to the metadata for register @var{num}.
+ETEXI
 
     {
         .name       = "csr-m",
@@ -1883,6 +1911,20 @@ ERST
 
 
     {
+        .name       = "csr-mw",
+        .args_type  = "num:i?",
+        .params     = "num",
+        .help       = "set watch on the metadata for csr register num",
+        .cmd        = hmp_csr_mw,
+    },
+
+STEXI
+@item csr-mw @var{num}
+@findex csr-mw
+Command to set a watchpoint on the metadata for csr register @var{num}.
+ETEXI
+
+    {
         .name       = "mem-m",
         .args_type  = "addr:i?",
         .params     = "addr",
@@ -1890,7 +1932,19 @@ ERST
         .cmd        = hmp_mem_m,
     },
 SRST
-``mem-m`` *num*
-  Dump the metadata for memory at address *num*
+``mem-m`` *addr*
+  Dump the metadata for memory at address *addr*
 ERST
 
+    {
+        .name       = "mem-mw",
+        .args_type  = "addr:i?",
+        .params     = "addr",
+        .help       = "watch metadata for memory addr",
+        .cmd        = hmp_mem_mw,
+    },
+
+SRST
+``mem-mw`` *addr*
+  Command to set a watch-point on any change to the metadata for memory at address *addr*.
+ERST
