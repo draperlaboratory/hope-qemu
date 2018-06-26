@@ -31,5 +31,9 @@ void policy_validator_get_pc_tag(char *dest, int n);
 void policy_validator_get_mem_tag(char *dest, int n, uint64_t addr);
 void policy_validator_get_csr_tag(char *dest, int n, uint64_t addr);
 void policy_validator_get_reg_tag(char *dest, int n, uint64_t addr);
-
+void policy_validator_set_pc_watch(void);
+void policy_validator_set_reg_watch(uint64_t addr);
+void policy_validator_set_csr_watch(uint64_t addr);
+void policy_validator_set_mem_watch(uint64_t addr);
+;
 #endif /* POLICY_VALIDATOR_H */
