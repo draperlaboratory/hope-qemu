@@ -135,6 +135,10 @@ void hmp_env_m(Monitor *mon, const QDict *qdict);
 void hmp_reg_m(Monitor *mon, const QDict *qdict);
 void hmp_csr_m(Monitor *mon, const QDict *qdict);
 void hmp_mem_m(Monitor *mon, const QDict *qdict);
+void hmp_env_mw(Monitor *mon, const QDict *qdict);
+void hmp_reg_mw(Monitor *mon, const QDict *qdict);
+void hmp_csr_mw(Monitor *mon, const QDict *qdict);
+void hmp_mem_mw(Monitor *mon, const QDict *qdict);
 
 
 #endif

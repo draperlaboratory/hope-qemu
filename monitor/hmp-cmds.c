@@ -2246,6 +2246,11 @@ void hmp_env_m(Monitor *mon, const QDict *qdict)
     g_free(msg);
 }
 
+void hmp_env_mw(Monitor *mon, const QDict *qdict)
+{
+    policy_validator_set_pc_watch();
+}
+
 void hmp_reg_m(Monitor *mon, const QDict *qdict)
 {
     int reg_num;
@@ -2257,6 +2262,14 @@ void hmp_reg_m(Monitor *mon, const QDict *qdict)
 
     monitor_printf(mon, " %s \n", msg);
     g_free(msg);
+}
+
+void hmp_reg_mw(Monitor *mon, const QDict *qdict)
+{
+    int reg_num;
+    reg_num = qdict_get_int(qdict, "addr");
+
+    policy_validator_set_reg_watch(reg_num);
 }
 
 void hmp_csr_m(Monitor *mon, const QDict *qdict)
@@ -2272,6 +2285,14 @@ void hmp_csr_m(Monitor *mon, const QDict *qdict)
     g_free(msg);
 }
 
+void hmp_csr_mw(Monitor *mon, const QDict *qdict)
+{
+    int reg_num;
+    reg_num = qdict_get_int(qdict, "addr");
+
+    policy_validator_set_csr_watch(reg_num);
+}
+
 void hmp_mem_m(Monitor *mon, const QDict *qdict)
 {
     int64_t addr;
@@ -2283,4 +2304,12 @@ void hmp_mem_m(Monitor *mon, const QDict *qdict)
 
     monitor_printf(mon, " %s \n", msg);
     g_free(msg);
+}
+
+void hmp_mem_mw(Monitor *mon, const QDict *qdict)
+{
+    uint64_t addr;
+    addr = qdict_get_int(qdict, "addr");
+
+    policy_validator_set_mem_watch(addr);
 }
