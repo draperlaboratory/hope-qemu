@@ -849,13 +849,26 @@ static bool riscv_tr_breakpoint_check(DisasContextBase *dcbase, CPUState *cpu,
     return true;
 }
 
+static CPURISCVState* policy_validator_hack_env;
+
 static void riscv_tr_translate_insn(DisasContextBase *dcbase, CPUState *cpu)
 {
+    static bool commit_pending = false;
     DisasContext *ctx = container_of(dcbase, DisasContext, base);
     CPURISCVState *env = cpu->env_ptr;
     uint16_t opcode16 = translator_lduw(env, ctx->base.pc_next);
 
+    policy_validator_hack_env = env;
+
+
     ctx->opcode = cpu_ldl_code(env, ctx->base.pc_next);
+    decode_opc(env, ctx, opcode16);
+
+    if (commit_pending) {
+        commit_pending = false;
+        if(policy_validator_commit()) //hit a metadata watchpoint
+            gen_exception_debug();
+    }
 
     uint32_t pc = ctx->base.pc_next;
     if(pc != 0x1000 && pc != 0x1004) { //reset ROM
@@ -867,10 +880,10 @@ static void riscv_tr_translate_insn(DisasContextBase *dcbase, CPUState *cpu)
             g_free(msg);
             exit(1);
         }
-        policy_validator_commit();
+
+        commit_pending = true;
     }
 
-    decode_opc(env, ctx, opcode16);
     ctx->base.pc_next = ctx->pc_succ_insn;
 
     if (ctx->base.is_jmp == DISAS_NEXT) {
@@ -883,13 +896,10 @@ static void riscv_tr_translate_insn(DisasContextBase *dcbase, CPUState *cpu)
     }
 }
 
-static CPURISCVState* policy_validator_hack_env;
 
 static void riscv_tr_tb_stop(DisasContextBase *dcbase, CPUState *cpu)
 {
     DisasContext *ctx = container_of(dcbase, DisasContext, base);
-
-    policy_validator_hack_env = cpu->env_ptr;
 
     switch (ctx->base.is_jmp) {
     case DISAS_TOO_MANY:
@@ -899,21 +909,6 @@ static void riscv_tr_tb_stop(DisasContextBase *dcbase, CPUState *cpu)
         break;
     default:
         g_assert_not_reached();
-    }
-
-    uint32_t pc = ctx->base.pc_first;
-
-    if(pc != 0x1000 && pc != 0x1004) { //reset ROM
-        if(!policy_validator_validate(pc, ctx->opcode)) {
-            char *msg = g_malloc(1024);
-            policy_validator_violation_msg(msg, 1024);
-            qemu_log("%s", msg);
-            qemu_log("MSG: End test.\n");
-            g_free(msg);
-            exit(1);
-        }
-        policy_validator_commit();
-        qemu_log("Finished validation for pc = 0x%x\n", pc);
     }
 }
 
