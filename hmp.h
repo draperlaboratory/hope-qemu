@@ -146,5 +146,15 @@ void hmp_hotpluggable_cpus(Monitor *mon, const QDict *qdict);
 void hmp_info_vm_generation_id(Monitor *mon, const QDict *qdict);
 void hmp_info_memory_size_summary(Monitor *mon, const QDict *qdict);
 void hmp_info_sev(Monitor *mon, const QDict *qdict);
+void hmp_pvm(Monitor *mon, const QDict *qdict);
+void hmp_env_m(Monitor *mon, const QDict *qdict);
+void hmp_reg_m(Monitor *mon, const QDict *qdict);
+void hmp_csr_m(Monitor *mon, const QDict *qdict);
+void hmp_mem_m(Monitor *mon, const QDict *qdict);
+void hmp_env_mw(Monitor *mon, const QDict *qdict);
+void hmp_reg_mw(Monitor *mon, const QDict *qdict);
+void hmp_csr_mw(Monitor *mon, const QDict *qdict);
+void hmp_mem_mw(Monitor *mon, const QDict *qdict);
+
 
 #endif

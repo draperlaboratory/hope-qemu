@@ -53,6 +53,7 @@
 #include "hw/intc/intc.h"
 #include "migration/snapshot.h"
 #include "migration/misc.h"
+#include "policy_validator.h"
 
 #ifdef CONFIG_SPICE
 #include <spice/enums.h>
@@ -2960,4 +2961,90 @@ void hmp_info_memory_size_summary(Monitor *mon, const QDict *qdict)
         qapi_free_MemoryInfo(info);
     }
     hmp_handle_error(mon, &err);
+}
+
+void hmp_pvm(Monitor *mon, const QDict *qdict)
+{
+    char *msg = g_malloc(1024);
+    policy_validator_violation_msg(msg, 1024);
+
+    monitor_printf(mon, " %s \n", msg);
+    g_free(msg);
+}
+
+void hmp_env_m(Monitor *mon, const QDict *qdict)
+{
+    char *msg = g_malloc(1024);
+    policy_validator_get_pc_tag(msg, 1024);
+
+    monitor_printf(mon, " %s \n", msg);
+    g_free(msg);
+}
+
+void hmp_env_mw(Monitor *mon, const QDict *qdict)
+{
+    policy_validator_set_pc_watch();
+}
+
+void hmp_reg_m(Monitor *mon, const QDict *qdict)
+{
+    int reg_num;
+
+    reg_num = qdict_get_int(qdict, "num");
+
+    char *msg = g_malloc(1024);
+    policy_validator_get_reg_tag(msg, 1024, reg_num);
+
+    monitor_printf(mon, " %s \n", msg);
+    g_free(msg);
+}
+
+void hmp_reg_mw(Monitor *mon, const QDict *qdict)
+{
+    int reg_num;
+    reg_num = qdict_get_int(qdict, "addr");
+
+    policy_validator_set_reg_watch(reg_num);
+}
+
+void hmp_csr_m(Monitor *mon, const QDict *qdict)
+{
+    int reg_num;
+
+    reg_num = qdict_get_int(qdict, "num");
+
+    char *msg = g_malloc(1024);
+    policy_validator_get_csr_tag(msg, 1024, reg_num);
+
+    monitor_printf(mon, " %s \n", msg);
+    g_free(msg);
+}
+
+void hmp_csr_mw(Monitor *mon, const QDict *qdict)
+{
+    int reg_num;
+    reg_num = qdict_get_int(qdict, "addr");
+
+    policy_validator_set_csr_watch(reg_num);
+}
+
+void hmp_mem_m(Monitor *mon, const QDict *qdict)
+{
+    int64_t addr;
+
+    addr = qdict_get_int(qdict, "addr");
+
+    char *msg = g_malloc(1024);
+    policy_validator_get_mem_tag(msg, 1024, addr);
+
+    monitor_printf(mon, " %s \n", msg);
+    g_free(msg);
+}
+
+void hmp_mem_mw(Monitor *mon, const QDict *qdict)
+{
+    uint64_t addr;
+    addr = qdict_get_int(qdict, "addr");
+
+    policy_validator_set_mem_watch(addr);
 }
