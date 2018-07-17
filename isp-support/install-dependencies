@@ -1,0 +1,14 @@
+#!/bin/bash
+
+apt-get update
+
+apt-get install -y \
+        bison \
+        build-essential \
+        flex \
+        libglib2.0-dev \
+        libpixman-1-dev \
+        libyaml-cpp-dev \
+        pkg-config \
+        python \
+        zlib1g-dev

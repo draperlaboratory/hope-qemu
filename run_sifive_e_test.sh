@@ -37,7 +37,11 @@ TAG_FILE=$dot/$TAG_FILE
 FREEDOM_E_SDK_DIR=$dot/../freedom-e-sdk
 TEST_OUTPUT_DIR=output/$BINARY_NAME
 
-export RISCV_PATH=$ISP_PREFIX
+if [ -z "$ISP_PREFIX" ]; then
+    export RISCV_PATH=/opt/isp/
+else
+    export RISCV_PATH=$ISP_PREFIX
+fi
 
 make -C $FREEDOM_E_SDK_DIR software PROGRAM=$BINARY_NAME BOARD=freedom-e300-hifive1
 
