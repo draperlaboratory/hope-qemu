@@ -4,13 +4,19 @@
 
 ISP_PREFIX ?= /opt/isp/
 
+CONFIGURE_OPTIONS := --target-list=riscv32-linux-user,riscv32-softmmu,riscv64-linux-user,riscv64-softmmu
+CONFIGURE_OPTIONS += --with-validator-lib=$(ISP_PREFIX)/lib
+CONFIGURE_OPTIONS += --with-validator-include=$(ISP_PREFIX)/include
+CONFIGURE_OPTIONS += --prefix=$(ISP_PREFIX)
+CONFIGURE_OPTIONS += --disable-git-update
+
 all: build/Makefile
 	$(MAKE) -C build
 
 build/Makefile:
 	$(MAKE) clean
 	mkdir build
-	cd build; ../configure --target-list=riscv32-linux-user,riscv32-softmmu,riscv64-linux-user,riscv64-softmmu --with-validator-lib=$(ISP_PREFIX)/lib --with-validator-include=$(ISP_PREFIX)/include --prefix=$(ISP_PREFIX)
+	cd build; ../configure $(CONFIGURE_OPTIONS)
 
 install:
 	$(MAKE) -C build install
