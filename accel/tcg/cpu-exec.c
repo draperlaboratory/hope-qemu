@@ -399,9 +399,7 @@ static inline TranslationBlock *tb_find(CPUState *cpu,
     tb = tb_lookup__cpu_state(cpu, &pc, &cs_base, &flags, cf_mask);
     if (tb == NULL || policy_validator_enabled()) {
         mmap_lock();
-        if (policy_validator_enabled()) {
-            tb = tb_gen_code(cpu, pc, cs_base, flags, cf_mask);
-        }
+        tb = tb_gen_code(cpu, pc, cs_base, flags, cf_mask);
         mmap_unlock();
         /* We add the TB in the virtual pc hash table for the fast lookup */
         atomic_set(&cpu->tb_jmp_cache[tb_jmp_cache_hash_func(pc)], tb);
