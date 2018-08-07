@@ -8,7 +8,6 @@ CONFIGURE_OPTIONS := --target-list=riscv32-linux-user,riscv32-softmmu,riscv64-li
 CONFIGURE_OPTIONS += --with-validator-lib=$(ISP_PREFIX)/lib
 CONFIGURE_OPTIONS += --with-validator-include=$(ISP_PREFIX)/include
 CONFIGURE_OPTIONS += --prefix=$(ISP_PREFIX)
-CONFIGURE_OPTIONS += --disable-git-update
 
 all: build/Makefile
 	$(MAKE) -C build
@@ -22,4 +21,5 @@ install:
 	$(MAKE) -C build install
 
 clean:
+	-$(MAKE) -C build clean
 	$(RM) -r build
