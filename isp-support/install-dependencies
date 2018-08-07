@@ -6,6 +6,7 @@ apt-get install -y \
         bison \
         build-essential \
         flex \
+        git \
         libglib2.0-dev \
         libpixman-1-dev \
         libyaml-cpp-dev \
