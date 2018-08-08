@@ -7,6 +7,7 @@ apt-get install -y \
         curl \
         build-essential \
         flex \
+        git \
         libglib2.0-dev \
         libpixman-1-dev \
         libyaml-cpp-dev \
