@@ -4,6 +4,7 @@ apt-get update
 
 apt-get install -y \
         bison \
+        curl \
         build-essential \
         flex \
         libglib2.0-dev \
