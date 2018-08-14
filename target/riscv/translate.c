@@ -871,7 +871,7 @@ static void riscv_tr_translate_insn(DisasContextBase *dcbase, CPUState *cpu)
     }
 
     uint32_t pc = ctx->base.pc_next;
-    if(pc != 0x1000 && pc != 0x1004) { //reset ROM
+    if (!(pc >= 0x1000 && pc < 0x2000)) { //reset ROM
         if(!policy_validator_validate(pc, ctx->opcode)) {
             char *msg = g_malloc(1024);
             policy_validator_violation_msg(msg, 1024);
