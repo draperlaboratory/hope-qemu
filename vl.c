@@ -537,6 +537,9 @@ static QemuOptsList qemu_policy_validator_cfg_opts = {
         }, {
             .name = "tag-info-file",
             .type = QEMU_OPT_STRING,
+        }, {
+            .name = "soc-cfg-path",
+            .type = QEMU_OPT_STRING,
         },
         { /* end of list */ }
     },
@@ -3857,6 +3860,7 @@ int main(int argc, char **argv, char **envp)
 
                     set_policy_validator_policy_path(qemu_opt_get(opts, "policy-path"));
                     set_policy_validator_tag_info_file(qemu_opt_get(opts, "tag-info-file"));
+                    set_policy_validator_soc_cfg_path(qemu_opt_get(opts, "soc-cfg-path"));
                 }
                 break;
             case QEMU_OPTION_nouserconfig:
