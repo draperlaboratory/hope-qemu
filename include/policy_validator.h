@@ -11,6 +11,7 @@ typedef struct PolicyValidatorConfig {
     bool enabled;
     const char* policy_path;
     const char* tag_info_file;
+    const char* soc_cfg_path;
 } PolicyValidatorConfig;
 
 
@@ -19,9 +20,11 @@ bool policy_validator_enabled(void);
 
 void set_policy_validator_policy_path(const char* path);
 void set_policy_validator_tag_info_file(const char* file);
+void set_policy_validator_soc_cfg_path(const char* file);
 
 const char* get_policy_validator_policy_path(void);
 const char* get_policy_validator_tag_info_file(void);
+const char* get_policy_validator_soc_cfg_path(void);
 
 void set_policy_validator_metadata(void);
 bool policy_validator_commit(void);
