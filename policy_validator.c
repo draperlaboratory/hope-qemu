@@ -25,6 +25,13 @@ void set_policy_validator_tag_info_file(const char* file)
     policy_validator.tag_info_file = file;
 }
 
+
+void set_policy_validator_soc_cfg_path(const char* path)
+{
+    printf("set soc cfg path to%s\n", path);
+    policy_validator.soc_cfg_path = path;
+}
+
 const char* get_policy_validator_policy_path(void)
 {
     return policy_validator.policy_path;
@@ -35,12 +42,18 @@ const char* get_policy_validator_tag_info_file(void)
     return policy_validator.tag_info_file;
 }
 
+const char* get_policy_validator_soc_cfg_path(void)
+{
+    return policy_validator.soc_cfg_path;
+}
+
 void set_policy_validator_metadata(void)
 {
 #ifdef ENABLE_VALIDATOR
     if (policy_validator_enabled())
         e_v_set_metadata(policy_validator.policy_path,
-                         policy_validator.tag_info_file);
+                         policy_validator.tag_info_file,
+                         policy_validator.soc_cfg_path);
 #endif
 }
 
