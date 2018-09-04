@@ -5020,12 +5020,12 @@ SRST
 ERST
 
 DEF("policy-validator-cfg", HAS_ARG, QEMU_OPTION_policy_validator_cfg, \
-    "-policy-validator-cfg policy-path=<dir>,tag-info-file=<file>,soc-cfg-path=<path>\n"
-    "                setup the policy <dir> and tag-info-file <file> for policy metadata.\n",
+    "-policy-validator-cfg yaml-cfg=<path>\n"
+    "                set the policy validator yaml config file to <path>.\n",
     QEMU_ARCH_RISCV)
 SRST
-``-policy-validator-cfg policy-path=dir,tag-info-file=file,soc-cfg-path=path``
-Policy dir and metadata tag info file.
+``-policy-validator-cfg yaml-cfg=path``
+Policy validator yaml configuration.
 ERST
 
 HXCOMM This is the last statement. Insert new options before this line!
