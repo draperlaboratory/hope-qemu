@@ -13,47 +13,22 @@ void set_policy_validator_enabled(bool val)
     policy_validator.enabled = val;
 }
 
-void set_policy_validator_policy_path(const char* path)
+void set_policy_validator_cfg_path(const char* path)
 {
-    printf("set policy dir path to%s\n", path);
-    policy_validator.policy_path = path;
-}
-
-void set_policy_validator_tag_info_file(const char* file)
-{
-    printf("set policy tag file to%s\n", file);
-    policy_validator.tag_info_file = file;
+    policy_validator.validator_cfg_path = path;
 }
 
 
-void set_policy_validator_soc_cfg_path(const char* path)
+const char* get_policy_validator_cfg_path(void)
 {
-    printf("set soc cfg path to%s\n", path);
-    policy_validator.soc_cfg_path = path;
-}
-
-const char* get_policy_validator_policy_path(void)
-{
-    return policy_validator.policy_path;
-}
-
-const char* get_policy_validator_tag_info_file(void)
-{
-    return policy_validator.tag_info_file;
-}
-
-const char* get_policy_validator_soc_cfg_path(void)
-{
-    return policy_validator.soc_cfg_path;
+    return policy_validator.validator_cfg_path;
 }
 
 void set_policy_validator_metadata(void)
 {
 #ifdef ENABLE_VALIDATOR
     if (policy_validator_enabled())
-        e_v_set_metadata(policy_validator.policy_path,
-                         policy_validator.tag_info_file,
-                         policy_validator.soc_cfg_path);
+        e_v_set_metadata(policy_validator.validator_cfg_path);
 #endif
 }
 

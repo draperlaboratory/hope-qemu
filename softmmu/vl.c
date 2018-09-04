@@ -516,13 +516,7 @@ static QemuOptsList qemu_policy_validator_cfg_opts = {
             .name = "enable",
             .type = QEMU_OPT_BOOL,
         }, {
-            .name = "policy-path",
-            .type = QEMU_OPT_STRING,
-        }, {
-            .name = "tag-info-file",
-            .type = QEMU_OPT_STRING,
-        }, {
-            .name = "soc-cfg-path",
+            .name = "yaml-cfg",
             .type = QEMU_OPT_STRING,
         },
         { /* end of list */ }
@@ -3827,9 +3821,7 @@ void qemu_init(int argc, char **argv, char **envp)
                     set_policy_validator_enabled(qemu_opt_get_bool(opts, "enable",
                                                                    true));
 
-                    set_policy_validator_policy_path(qemu_opt_get(opts, "policy-path"));
-                    set_policy_validator_tag_info_file(qemu_opt_get(opts, "tag-info-file"));
-                    set_policy_validator_soc_cfg_path(qemu_opt_get(opts, "soc-cfg-path"));
+                    set_policy_validator_cfg_path(qemu_opt_get(opts, "yaml-cfg"));
                 }
                 break;
             case QEMU_OPTION_nouserconfig:

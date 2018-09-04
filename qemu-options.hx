@@ -5098,13 +5098,13 @@ SRST
 ERST
 
 DEF("policy-validator-cfg", HAS_ARG, QEMU_OPTION_policy_validator_cfg,
-    "-policy-validator-cfg policy-path=<dir>,tag-info-file=<file>,soc-cfg-path=<path>\n"
-    "                setup the policy <dir> and tag-info-file <file> for policy metadata.\n",
+    "-policy-validator-cfg yaml-cfg=<path>\n"
+    "                set the policy validator yaml config file to <path>.\n",
     QEMU_ARCH_RISCV)
 STEXI
-@item -policy-validator-cfg policy-path=@var{dir},tag-info-file=@var{file},soc-cfg-path=@var{path}
+@item -policy-validator-cfg yaml-cfg=@var{path}
 @findex -policy-validator-cfg
-Policy dir and metadata tag info file.
+Policy validator yaml configuration.
 ETEXI
 
 HXCOMM This is the last statement. Insert new options before this line!
