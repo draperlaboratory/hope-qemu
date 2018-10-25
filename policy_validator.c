@@ -106,3 +106,10 @@ void policy_validator_set_mem_watch(uint64_t addr)
     e_v_set_mem_watch(addr);
 #endif
 }
+
+void policy_validator_rule_cache_stats(void)
+{
+#ifdef ENABLE_VALIDATOR
+    e_v_rule_cache_stats();
+#endif
+}
