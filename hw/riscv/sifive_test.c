@@ -27,6 +27,8 @@
 #include "hw/hw.h"
 #include "hw/riscv/sifive_test.h"
 
+#include "policy_validator.h"
+
 static uint64_t sifive_test_read(void *opaque, hwaddr addr, unsigned int size)
 {
     return 0;
@@ -38,6 +40,7 @@ static void sifive_test_write(void *opaque, hwaddr addr,
     if (addr == 0) {
         int status = val64 & 0xffff;
         int code = (val64 >> 16) & 0xffff;
+        policy_validator_rule_cache_stats();
         switch (status) {
         case FINISHER_FAIL:
             exit(code);
