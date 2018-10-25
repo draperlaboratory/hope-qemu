@@ -32,6 +32,7 @@
 #include "qemu/uuid.h"
 #include "sysemu/seccomp.h"
 #include "sysemu/tcg.h"
+#include "policy_validator.h"
 
 #ifdef CONFIG_SDL
 #if defined(__APPLE__) || defined(main)
@@ -129,8 +130,6 @@ int main(int argc, char **argv)
 #include "qapi/qmp/qerror.h"
 #include "sysemu/iothread.h"
 #include "qemu/guest-random.h"
-
-#include "policy_validator.h"
 
 #define MAX_VIRTIO_CONSOLES 1
 
