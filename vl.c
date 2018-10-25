@@ -4681,6 +4681,8 @@ int main(int argc, char **argv, char **envp)
     job_cancel_sync_all();
     bdrv_close_all();
 
+    policy_validator_rule_cache_stats();
+
     res_free();
 
     /* vhost-user must be cleaned up before chardevs.  */
