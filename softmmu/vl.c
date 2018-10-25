@@ -36,6 +36,7 @@
 #include "sysemu/runstate.h"
 #include "sysemu/seccomp.h"
 #include "sysemu/tcg.h"
+#include "policy_validator.h"
 
 #include "qemu/error-report.h"
 #include "qemu/sockets.h"
@@ -112,8 +113,6 @@
 #include "qapi/qmp/qerror.h"
 #include "sysemu/iothread.h"
 #include "qemu/guest-random.h"
-
-#include "policy_validator.h"
 
 #define MAX_VIRTIO_CONSOLES 1
 
