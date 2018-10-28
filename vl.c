@@ -131,8 +131,6 @@ int main(int argc, char **argv)
 #include "qapi/qmp/qerror.h"
 #include "sysemu/iothread.h"
 
-#include "policy_validator.h"
-
 #define MAX_VIRTIO_CONSOLES 1
 
 static const char *data_dir[16];
@@ -4680,8 +4678,6 @@ int main(int argc, char **argv, char **envp)
 
     job_cancel_sync_all();
     bdrv_close_all();
-
-    policy_validator_rule_cache_stats();
 
     res_free();
 
