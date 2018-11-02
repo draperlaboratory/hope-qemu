@@ -36,7 +36,7 @@ static void sifive_test_write(void *opaque, hwaddr addr,
     if (addr == 0) {
         int status = val64 & 0xffff;
         int code = (val64 >> 16) & 0xffff;
-	policy_validator_rule_cache_stats();
+        policy_validator_rule_cache_stats();
         switch (status) {
         case FINISHER_FAIL:
             exit(code);
