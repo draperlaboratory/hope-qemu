@@ -30,6 +30,7 @@
 #include "qemu/help_option.h"
 #include "qemu/uuid.h"
 #include "sysemu/seccomp.h"
+#include "policy_validator.h"
 
 #ifdef CONFIG_SDL
 #if defined(__APPLE__) || defined(main)
@@ -130,8 +131,6 @@ int main(int argc, char **argv)
 #include "qapi/qapi-commands-run-state.h"
 #include "qapi/qmp/qerror.h"
 #include "sysemu/iothread.h"
-
-#include "policy_validator.h"
 
 #define MAX_VIRTIO_CONSOLES 1
 
@@ -551,13 +550,7 @@ static QemuOptsList qemu_policy_validator_cfg_opts = {
             .name = "enable",
             .type = QEMU_OPT_BOOL,
         }, {
-            .name = "policy-path",
-            .type = QEMU_OPT_STRING,
-        }, {
-            .name = "tag-info-file",
-            .type = QEMU_OPT_STRING,
-        }, {
-            .name = "soc-cfg-path",
+            .name = "yaml-cfg",
             .type = QEMU_OPT_STRING,
         },
         { /* end of list */ }
@@ -3992,9 +3985,7 @@ int main(int argc, char **argv, char **envp)
                     set_policy_validator_enabled(qemu_opt_get_bool(opts, "enable",
                                                                    true));
 
-                    set_policy_validator_policy_path(qemu_opt_get(opts, "policy-path"));
-                    set_policy_validator_tag_info_file(qemu_opt_get(opts, "tag-info-file"));
-                    set_policy_validator_soc_cfg_path(qemu_opt_get(opts, "soc-cfg-path"));
+                    set_policy_validator_cfg_path(qemu_opt_get(opts, "yaml-cfg"));
                 }
                 break;
             case QEMU_OPTION_nodefconfig:
