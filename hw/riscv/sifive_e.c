@@ -37,6 +37,7 @@
 #include "hw/sysbus.h"
 #include "hw/char/serial.h"
 #include "hw/misc/unimp.h"
+#include "hw/net/cadence_gem.h"
 #include "target/riscv/cpu.h"
 #include "hw/riscv/riscv_hart.h"
 #include "hw/riscv/sifive_plic.h"
@@ -73,9 +74,20 @@ static const struct MemmapEntry {
     [SIFIVE_E_PWM1] =     { 0x10025000,     0x1000 },
     [SIFIVE_E_QSPI2] =    { 0x10034000,     0x1000 },
     [SIFIVE_E_PWM2] =     { 0x10035000,     0x1000 },
+    [SIFIVE_E_GEM] =      { 0x100900FC,     0x2000 },
     [SIFIVE_E_XIP] =      { 0x20000000, 0x20000000 },
     [SIFIVE_E_DTIM] =     { 0x80000000,     0x4000 }
 };
+
+#define GEM_REVISION        0x10070109
+
+static void sifive_mmio_emulate(MemoryRegion *parent, const char *name,
+                             uintptr_t offset, uintptr_t length)
+{
+    MemoryRegion *mock_mmio = g_new(MemoryRegion, 1);
+    memory_region_init_ram(mock_mmio, NULL, name, length, &error_fatal);
+    memory_region_add_subregion(parent, offset, mock_mmio);
+}
 
 static void riscv_sifive_e_init(MachineState *machine)
 {
@@ -209,6 +221,20 @@ static void riscv_sifive_e_soc_realize(DeviceState *dev, Error **errp)
         memmap[SIFIVE_E_QSPI2].base, memmap[SIFIVE_E_QSPI2].size);
     create_unimplemented_device("riscv.sifive.e.pwm2",
         memmap[SIFIVE_E_PWM2].base, memmap[SIFIVE_E_PWM2].size);
+
+    object_initialize(&s->gem, sizeof(s->gem), TYPE_CADENCE_GEM);
+    object_property_add_child(OBJECT(machine), "gem", OBJECT(&s->gem),
+                              &error_abort);
+    if (nd_table[0].used) {
+        qemu_check_nic_model(nd_table, TYPE_CADENCE_GEM);
+        qdev_set_nic_properties(DEVICE(&s->gem), nd_table);
+    }
+    object_property_set_int(OBJECT(&s->gem), GEM_REVISION, "revision",
+                            &error_abort);
+    object_property_set_bool(OBJECT(&s->gem), true, "realized", &error_abort);
+    sysbus_mmio_map(SYS_BUS_DEVICE(&s->gem), 0, memmap[SIFIVE_E_GEM].base);
+    sysbus_connect_irq(SYS_BUS_DEVICE(&s->gem), 0,
+                       qdev_get_gpio_in(DEVICE(s->plic), SIFIVE_E_GEM_IRQ));
 
     /* Flash memory */
     memory_region_init_rom(&s->xip_mem, OBJECT(dev), "riscv.sifive.e.xip",
