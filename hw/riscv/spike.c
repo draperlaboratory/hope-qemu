@@ -31,6 +31,7 @@
 #include "hw/boards.h"
 #include "hw/loader.h"
 #include "hw/sysbus.h"
+#include "hw/net/cadence_gem.h"
 #include "target/riscv/cpu.h"
 #include "hw/riscv/riscv_htif.h"
 #include "hw/riscv/riscv_hart.h"
@@ -53,7 +54,10 @@ static const struct MemmapEntry {
     [SPIKE_CLINT] =    {  0x2000000,    0x10000 },
     [SPIKE_PLIC] =     {  0xc000000,  0x4000000 },
     [SPIKE_DRAM] =     { 0x80000000,        0x0 },
+    [SPIKE_GEM]  =     { 0x1000B000,     0x1000 },
 };
+
+#define GEM_REVISION        0x10070109
 
 static uint64_t load_kernel(const char *kernel_filename)
 {
@@ -249,6 +253,20 @@ static void spike_v1_10_0_board_init(MachineState *machine)
                                  SPIKE_PLIC_CONTEXT_BASE,
                                  SPIKE_PLIC_CONTEXT_STRIDE,
                                  memmap[SPIKE_PLIC].size);
+
+    s->gem = (CadenceGEMState*)qdev_create(NULL, TYPE_CADENCE_GEM);
+
+    if (nd_table[0].used) {
+        qemu_check_nic_model(&nd_table[0], TYPE_CADENCE_GEM);
+        qdev_set_nic_properties(DEVICE(s->gem), &nd_table[0]);
+    }
+    object_property_set_int(OBJECT(s->gem), GEM_REVISION, "revision",
+                            &error_abort);
+    qdev_init_nofail(DEVICE(s->gem));
+    sysbus_mmio_map(SYS_BUS_DEVICE(s->gem), 0, memmap[SPIKE_GEM].base);
+
+    sysbus_connect_irq(SYS_BUS_DEVICE(s->gem), 0,
+                       qdev_get_gpio_in(DEVICE(s->plic), SPIKE_GEM_IRQ));
 
     /* initialize HTIF using symbols found in load_kernel */
     htif_mm_init(system_memory, mask_rom, &s->soc.harts[0].env, serial_hd(0));

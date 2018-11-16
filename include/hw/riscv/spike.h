@@ -26,6 +26,7 @@ typedef struct {
     /*< public >*/
     RISCVHartArrayState soc;
     DeviceState *plic;
+    CadenceGEMState *gem;
     void *fdt;
     int fdt_size;
 } SpikeState;
@@ -34,7 +35,12 @@ enum {
     SPIKE_MROM,
     SPIKE_CLINT,
     SPIKE_PLIC,
-    SPIKE_DRAM
+    SPIKE_DRAM,
+    SPIKE_GEM
+};
+
+enum {
+    SPIKE_GEM_IRQ = 0x35
 };
 
 enum {
