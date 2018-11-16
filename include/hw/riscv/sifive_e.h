@@ -30,6 +30,8 @@ typedef struct SiFiveESoCState {
     /*< public >*/
     RISCVHartArrayState cpus;
     DeviceState *plic;
+
+    CadenceGEMState gem;
 } SiFiveESoCState;
 
 typedef struct SiFiveEState {
@@ -60,12 +62,14 @@ enum {
     SIFIVE_E_QSPI2,
     SIFIVE_E_PWM2,
     SIFIVE_E_XIP,
-    SIFIVE_E_DTIM
+    SIFIVE_E_DTIM,
+    SIFIVE_E_GEM
 };
 
 enum {
     SIFIVE_E_UART0_IRQ = 3,
-    SIFIVE_E_UART1_IRQ = 4
+    SIFIVE_E_UART1_IRQ = 4,
+    SIFIVE_E_GEM_IRQ = 0x35
 };
 
 #define SIFIVE_E_PLIC_HART_CONFIG "M"
