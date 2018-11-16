@@ -55,7 +55,7 @@ static const struct MemmapEntry {
     hwaddr size;
 } sifive_e_memmap[] = {
     [SIFIVE_E_DEBUG] =    {        0x0,      0x100 },
-    [SIFIVE_E_MROM] =     {     0x1000,     0x2000 },
+    [SIFIVE_E_MROM] =     {     0x1000,    0x11000 },
     [SIFIVE_E_OTP] =      {    0x20000,     0x2000 },
     [SIFIVE_E_TEST] =     {   0x100000,     0x1000 },
     [SIFIVE_E_CLINT] =    {  0x2000000,    0x10000 },
@@ -73,7 +73,7 @@ static const struct MemmapEntry {
     [SIFIVE_E_QSPI2] =    { 0x10034000,     0x1000 },
     [SIFIVE_E_PWM2] =     { 0x10035000,     0x1000 },
     [SIFIVE_E_XIP] =      { 0x20000000, 0x20000000 },
-    [SIFIVE_E_DTIM] =     { 0x80000000,     0x4000 }
+    [SIFIVE_E_DTIM] =     { 0x80000000, 0x20000000 }
 };
 
 static uint64_t load_kernel(const char *kernel_filename)
