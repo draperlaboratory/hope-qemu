@@ -25,6 +25,7 @@ typedef struct {
 
     /*< public >*/
     RISCVHartArrayState soc;
+    DeviceState *plic;
     void *fdt;
     int fdt_size;
 } SpikeState;
@@ -32,6 +33,7 @@ typedef struct {
 enum {
     SPIKE_MROM,
     SPIKE_CLINT,
+    SPIKE_PLIC,
     SPIKE_DRAM
 };
 
@@ -39,6 +41,15 @@ enum {
     SPIKE_CLOCK_FREQ = 1000000000
 };
 
+#define SPIKE_PLIC_HART_CONFIG "MS"
+#define SPIKE_PLIC_NUM_SOURCES 127
+#define SPIKE_PLIC_NUM_PRIORITIES 7
+#define SPIKE_PLIC_PRIORITY_BASE 0x0
+#define SPIKE_PLIC_PENDING_BASE 0x1000
+#define SPIKE_PLIC_ENABLE_BASE 0x2000
+#define SPIKE_PLIC_ENABLE_STRIDE 0x80
+#define SPIKE_PLIC_CONTEXT_BASE 0x200000
+#define SPIKE_PLIC_CONTEXT_STRIDE 0x1000
 #if defined(TARGET_RISCV32)
 #define SPIKE_V1_09_1_CPU TYPE_RISCV_CPU_RV32GCSU_V1_09_1
 #define SPIKE_V1_10_0_CPU TYPE_RISCV_CPU_RV32GCSU_V1_10_0

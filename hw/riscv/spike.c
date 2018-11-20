@@ -35,6 +35,7 @@
 #include "hw/riscv/riscv_htif.h"
 #include "hw/riscv/riscv_hart.h"
 #include "hw/riscv/sifive_clint.h"
+#include "hw/riscv/sifive_plic.h"
 #include "hw/riscv/spike.h"
 #include "chardev/char.h"
 #include "sysemu/arch_init.h"
@@ -50,6 +51,7 @@ static const struct MemmapEntry {
 } spike_memmap[] = {
     [SPIKE_MROM] =     {     0x1000,    0x11000 },
     [SPIKE_CLINT] =    {  0x2000000,    0x10000 },
+    [SPIKE_PLIC] =     {  0xc000000,  0x4000000 },
     [SPIKE_DRAM] =     { 0x80000000,        0x0 },
 };
 
@@ -235,6 +237,18 @@ static void spike_v1_10_0_board_init(MachineState *machine)
     rom_add_blob_fixed_as("mrom.fdt", s->fdt, fdt_totalsize(s->fdt),
                           memmap[SPIKE_MROM].base + sizeof(reset_vec),
                           &address_space_memory);
+
+    s->plic = sifive_plic_create(memmap[SPIKE_PLIC].base,
+                                 (char *)SPIKE_PLIC_HART_CONFIG,
+                                 SPIKE_PLIC_NUM_SOURCES,
+                                 SPIKE_PLIC_NUM_PRIORITIES,
+                                 SPIKE_PLIC_PRIORITY_BASE,
+                                 SPIKE_PLIC_PENDING_BASE,
+                                 SPIKE_PLIC_ENABLE_BASE,
+                                 SPIKE_PLIC_ENABLE_STRIDE,
+                                 SPIKE_PLIC_CONTEXT_BASE,
+                                 SPIKE_PLIC_CONTEXT_STRIDE,
+                                 memmap[SPIKE_PLIC].size);
 
     /* initialize HTIF using symbols found in load_kernel */
     htif_mm_init(system_memory, mask_rom, &s->soc.harts[0].env, serial_hd(0));
