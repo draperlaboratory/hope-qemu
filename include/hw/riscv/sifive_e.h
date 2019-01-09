@@ -79,8 +79,8 @@ enum {
 enum {
     SIFIVE_E_UART0_IRQ  = 3,
     SIFIVE_E_UART1_IRQ  = 4,
-    SIFIVE_E_GPIO0_IRQ0 = 8,
-    SIFIVE_E_GEM_IRQ = 0x35
+    SIFIVE_E_GEM_IRQ    = 5,
+    SIFIVE_E_GPIO0_IRQ0 = 8
 };
 
 #define SIFIVE_E_PLIC_HART_CONFIG "M"
