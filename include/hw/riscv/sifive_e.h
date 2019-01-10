@@ -31,7 +31,11 @@ typedef struct SiFiveESoCState {
     RISCVHartArrayState cpus;
     DeviceState *plic;
 
+#ifdef SIFIVE_GEM_HOOKUP
     CadenceGEMState gem;
+#else
+    CadenceGEMState *gem;
+#endif
 } SiFiveESoCState;
 
 typedef struct SiFiveEState {
