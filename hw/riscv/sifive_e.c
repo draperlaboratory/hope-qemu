@@ -268,6 +268,7 @@ static void sifive_e_soc_realize(DeviceState *dev, Error **errp)
     create_unimplemented_device("riscv.sifive.e.pwm2",
         memmap[SIFIVE_E_PWM2].base, memmap[SIFIVE_E_PWM2].size);
 
+#ifdef SIFIVE_GEM_HOOKUP
     object_initialize(&s->gem, sizeof(s->gem), TYPE_CADENCE_GEM);
     object_property_add_child(OBJECT(machine), "gem", OBJECT(&s->gem),
                               &error_abort);
@@ -281,6 +282,21 @@ static void sifive_e_soc_realize(DeviceState *dev, Error **errp)
     sysbus_mmio_map(SYS_BUS_DEVICE(&s->gem), 0, memmap[SIFIVE_E_GEM].base);
     sysbus_connect_irq(SYS_BUS_DEVICE(&s->gem), 0,
                        qdev_get_gpio_in(DEVICE(s->plic), SIFIVE_E_GEM_IRQ));
+#else
+    s->gem = (CadenceGEMState*)qdev_create(NULL, TYPE_CADENCE_GEM);
+
+    if (nd_table[0].used) {
+        qemu_check_nic_model(&nd_table[0], TYPE_CADENCE_GEM);
+        qdev_set_nic_properties(DEVICE(s->gem), &nd_table[0]);
+    }
+    object_property_set_int(OBJECT(s->gem), GEM_REVISION, "revision",
+                            &error_abort);
+    qdev_init_nofail(DEVICE(s->gem));
+    sysbus_mmio_map(SYS_BUS_DEVICE(s->gem), 0, memmap[SIFIVE_E_GEM].base);
+
+    sysbus_connect_irq(SYS_BUS_DEVICE(s->gem), 0,
+                       qdev_get_gpio_in(DEVICE(s->plic), SIFIVE_E_GEM_IRQ));
+#endif
 
     /* Flash memory */
     memory_region_init_rom(&s->xip_mem, OBJECT(dev), "riscv.sifive.e.xip",
