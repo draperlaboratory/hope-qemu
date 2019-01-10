@@ -35,7 +35,11 @@ typedef struct SiFiveESoCState {
     RISCVHartArrayState cpus;
     DeviceState *plic;
     SIFIVEGPIOState gpio;
+#ifdef SIFIVE_GEM_HOOKUP
     CadenceGEMState gem;
+#else
+    CadenceGEMState *gem;
+#endif
     MemoryRegion xip_mem;
     MemoryRegion mask_rom;
 } SiFiveESoCState;
