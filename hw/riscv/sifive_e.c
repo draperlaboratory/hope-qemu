@@ -80,7 +80,7 @@ static const struct MemmapEntry {
     [SIFIVE_E_DTIM] =     { 0x80000000, 0x20000000 }
 };
 
-#define GEM_REVISION        0x10070109
+#define GEM_REVISION        0x00020118
 
 static uint64_t load_kernel(const char *kernel_filename)
 {
