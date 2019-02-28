@@ -74,7 +74,7 @@ static const struct MemmapEntry {
     [SIFIVE_E_PWM1] =     { 0x10025000,     0x1000 },
     [SIFIVE_E_QSPI2] =    { 0x10034000,     0x1000 },
     [SIFIVE_E_PWM2] =     { 0x10035000,     0x1000 },
-    [SIFIVE_E_GEM] =      { 0x100900FC,     0x2000 },
+    [SIFIVE_E_GEM] =      { 0x10090000,     0x2000 },
     [SIFIVE_E_XIP] =      { 0x20000000, 0x20000000 },
     [SIFIVE_E_DTIM] =     { 0x80000000, 0x20000000 }
 };
