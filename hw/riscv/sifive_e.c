@@ -79,7 +79,7 @@ static const struct MemmapEntry {
     [SIFIVE_E_DTIM] =     { 0x80000000, 0x20000000 }
 };
 
-#define GEM_REVISION        0x10070109
+#define GEM_REVISION        0x00020118
 
 static void sifive_mmio_emulate(MemoryRegion *parent, const char *name,
                              uintptr_t offset, uintptr_t length)
