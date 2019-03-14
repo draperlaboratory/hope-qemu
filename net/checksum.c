@@ -62,6 +62,7 @@ void net_checksum_calculate(uint8_t *data, int length)
 {
     int mac_hdr_len, ip_len;
     struct ip_header *ip;
+    uint16_t csum;
 
     /*
      * Note: We cannot assume "data" is aligned, so the all code uses
@@ -107,6 +108,11 @@ void net_checksum_calculate(uint8_t *data, int length)
         return; /* not IPv4 */
     }
 
+    /* calculate IP checksum */
+    ip->ip_sum = 0;  /* clear first, in case it was set */
+    csum = net_raw_checksum((uint8_t *)ip, sizeof(*ip));
+    ip->ip_sum = cpu_to_be16(csum);
+
     ip_len = lduw_be_p(&ip->ip_len);
 
     /* Last, check that we have enough data for the all IP frame */
@@ -119,7 +125,6 @@ void net_checksum_calculate(uint8_t *data, int length)
     switch (ip->ip_p) {
     case IP_PROTO_TCP:
     {
-        uint16_t csum;
         tcp_header *tcp = (tcp_header *)(ip + 1);
 
         if (ip_len < sizeof(tcp_header)) {
@@ -140,7 +145,6 @@ void net_checksum_calculate(uint8_t *data, int length)
     }
     case IP_PROTO_UDP:
     {
-        uint16_t csum;
         udp_header *udp = (udp_header *)(ip + 1);
 
         if (ip_len < sizeof(udp_header)) {
