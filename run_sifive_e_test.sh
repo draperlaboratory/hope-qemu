@@ -38,7 +38,7 @@ FREEDOM_E_SDK_DIR=$dot/../freedom-e-sdk
 TEST_OUTPUT_DIR=output/$BINARY_NAME
 
 if [ -z "$ISP_PREFIX" ]; then
-    export RISCV_PATH=/opt/isp/
+    export RISCV_PATH=$HOME/.local/isp/
 else
     export RISCV_PATH=$ISP_PREFIX
 fi

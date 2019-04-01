@@ -2,7 +2,7 @@
 .PHONY: install
 .PHONY: clean
 
-ISP_PREFIX ?= /opt/isp/
+ISP_PREFIX ?= $(HOME)/.local/isp/
 
 CONFIGURE_OPTIONS := --target-list=riscv32-linux-user,riscv32-softmmu,riscv64-linux-user,riscv64-softmmu
 CONFIGURE_OPTIONS += --with-validator-lib=$(ISP_PREFIX)/lib
