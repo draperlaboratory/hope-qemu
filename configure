@@ -6550,12 +6550,12 @@ echo_version() {
     fi
 }
 
-if test "${validator_lib+set}" = set; then :
+if test -n "$validator_lib"; then :
    QEMU_LDFLAGS="-L$validator_lib $QEMU_LDFLAGS"
    LIBS="-lrv32-renode-validator $LIBS"
 fi
 
-if test "${validator_include+set}" = set; then :
+if test -n "$validator_include}"; then :
    QEMU_CFLAGS="-I$validator_include $QEMU_CFLAGS"
 fi
 
@@ -8174,7 +8174,7 @@ fi
 
 # Currently the external validator only supports riscv32
 if test "$target_name" = "riscv32"; then :
-    if test "${validator_include+set}" = set; then :
+    if test -n "$validator_include"; then :
         cflags="-DENABLE_VALIDATOR $cflags"
     fi
 fi
