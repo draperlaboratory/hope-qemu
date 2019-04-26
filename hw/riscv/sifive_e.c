@@ -270,8 +270,9 @@ static void sifive_e_soc_realize(DeviceState *dev, Error **errp)
 
 #ifdef SIFIVE_GEM_HOOKUP
     object_initialize(&s->gem, sizeof(s->gem), TYPE_CADENCE_GEM);
-    object_property_add_child(OBJECT(machine), "gem", OBJECT(&s->gem),
-                              &error_abort);
+    sysbus_init_child_obj(OBJECT(machine), "gem", &s->gem, sizeof(s->gem),
+                          TYPE_CADENCE_GEM);
+
     if (nd_table[0].used) {
         qemu_check_nic_model(nd_table, TYPE_CADENCE_GEM);
         qdev_set_nic_properties(DEVICE(&s->gem), nd_table);
