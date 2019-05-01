@@ -2267,7 +2267,7 @@ void hmp_reg_m(Monitor *mon, const QDict *qdict)
 void hmp_reg_mw(Monitor *mon, const QDict *qdict)
 {
     int reg_num;
-    reg_num = qdict_get_int(qdict, "addr");
+    reg_num = qdict_get_int(qdict, "num");
 
     policy_validator_set_reg_watch(reg_num);
 }
@@ -2288,7 +2288,7 @@ void hmp_csr_m(Monitor *mon, const QDict *qdict)
 void hmp_csr_mw(Monitor *mon, const QDict *qdict)
 {
     int reg_num;
-    reg_num = qdict_get_int(qdict, "addr");
+    reg_num = qdict_get_int(qdict, "num");
 
     policy_validator_set_csr_watch(reg_num);
 }
