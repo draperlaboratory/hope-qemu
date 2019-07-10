@@ -42,6 +42,15 @@ bool policy_validator_commit(void)
     return true;
 }
 
+bool policy_validator_check_cached(void)
+{
+#ifdef ENABLE_VALIDATOR
+    return e_v_last_cached();
+#else
+    return true;
+#endif
+}
+
 void policy_validator_violation_msg(char* dest, int n)
 {
 #ifdef ENABLE_VALIDATOR

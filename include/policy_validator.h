@@ -33,5 +33,5 @@ void policy_validator_set_reg_watch(uint64_t addr);
 void policy_validator_set_csr_watch(uint64_t addr);
 void policy_validator_set_mem_watch(uint64_t addr);
 void policy_validator_rule_cache_stats(void);
-;
+bool policy_validator_check_cached(void);
 #endif /* POLICY_VALIDATOR_H */
