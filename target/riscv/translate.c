@@ -844,9 +844,19 @@ static void riscv_tr_translate_insn(DisasContextBase *dcbase, CPUState *cpu)
             char *msg = g_malloc(1024);
             policy_validator_violation_msg(msg, 1024);
             qemu_log("%s", msg);
-            qemu_log("MSG: End test.\n");
             g_free(msg);
+
+#ifdef CONFIG_USER_ONLY
+            qemu_log("MSG: End test.\n");
             exit(1);
+#else
+            if (env->mpipeen) {
+               generate_exception_mbadaddr(ctx, RISCV_POLICY_VIOLATION_FAULT);
+            } else {
+               qemu_log("MSG: End test.\n");
+               exit(1);
+            }
+#endif
         }
 
         commit_pending = true;
