@@ -478,7 +478,24 @@ static int write_mcounteren(CPURISCVState *env, int csrno, target_ulong val)
     return 0;
 }
 
-/* This regiser is replaced with CSR_MCOUNTINHIBIT in 1.11.0 */
+static int read_mpipeen(CPURISCVState *env, int csrno, target_ulong *val)
+{
+    if (env->priv_ver < PRIV_VERSION_1_10_0) {
+        return -1;
+    }
+    *val = env->mpipeen;
+    return 0;
+}
+
+static int write_mpipeen(CPURISCVState *env, int csrno, target_ulong val)
+{
+    if (env->priv_ver < PRIV_VERSION_1_10_0) {
+        return -1;
+    }
+    env->mpipeen = val;
+    return 0;
+}
+
 static int read_mscounteren(CPURISCVState *env, int csrno, target_ulong *val)
 {
     if (env->priv_ver > PRIV_VERSION_1_09_1
@@ -915,6 +932,7 @@ static riscv_csr_operations csr_ops[CSR_TABLE_SIZE] = {
     [CSR_MIE] =                 { any,  read_mie,         write_mie         },
     [CSR_MTVEC] =               { any,  read_mtvec,       write_mtvec       },
     [CSR_MCOUNTEREN] =          { any,  read_mcounteren,  write_mcounteren  },
+    [CSR_MPIPEEN] =             { any,  read_mpipeen,     write_mpipeen  },
 
     /* Legacy Counter Setup (priv v1.9.1) */
     [CSR_MUCOUNTEREN] =         { any,  read_mucounteren, write_mucounteren },

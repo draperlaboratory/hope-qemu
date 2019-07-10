@@ -1164,6 +1164,7 @@ static const char *csr_name(int csrno)
     case 0x0304: return "mie";
     case 0x0305: return "mtvec";
     case 0x0306: return "mcounteren";
+    case 0x0307: return "mpipeen";
     case 0x0320: return "mucounteren";
     case 0x0321: return "mscounteren";
     case 0x0322: return "mhcounteren";
