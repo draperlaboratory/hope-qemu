@@ -277,6 +277,7 @@ static void riscv_cpu_reset(CPUState *cs)
 #ifndef CONFIG_USER_ONLY
     env->priv = PRV_M;
     env->mstatus &= ~(MSTATUS_MIE | MSTATUS_MPRV);
+    env->mpipeen = 0;
     env->mcause = 0;
     env->pc = env->resetvec;
 #endif
