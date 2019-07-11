@@ -168,6 +168,7 @@ struct CPURISCVState {
     target_ulong mcounteren;
 
     target_ulong mpipeen;
+    target_ulong lpipeen;
 
     target_ulong sscratch;
     target_ulong mscratch;
