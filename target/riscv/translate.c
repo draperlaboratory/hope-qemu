@@ -801,8 +801,8 @@ static void riscv_tr_translate_insn(DisasContextBase *dcbase, CPUState *cpu)
 #endif
         }
 #ifndef CONFIG_USER_ONLY
-        else if ((env->mpipeen) && (!policy_validator_check_cached())) {
-            generate_exception_mbadaddr(ctx, RISCV_POLICY_CACHE_MISS_FAULT);
+        else if ((!policy_validator_check_cached()) && (env->mpipeen)) {
+           generate_exception_mbadaddr(ctx, RISCV_POLICY_CACHE_MISS_FAULT);
         }
 #endif
 
