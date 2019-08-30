@@ -481,6 +481,13 @@ static void riscv_cpu_realize(DeviceState *dev, Error **errp)
        qemu_printf("\nEnabling Validator Extension\n");
     }
 
+    if (!cpu->cfg.ext_f) {
+       set_misa(env, env->misa & ~RVF);
+
+       qemu_printf("\nForce Disable Floating Point Extension\n");
+    }
+
+
     riscv_cpu_register_gdb_regs_for_features(cs);
 
     qemu_init_vcpu(cs);
