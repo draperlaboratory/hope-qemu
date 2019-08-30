@@ -110,6 +110,7 @@ void policy_validator_set_mem_watch(uint64_t addr)
 void policy_validator_rule_cache_stats(void)
 {
 #ifdef ENABLE_VALIDATOR
-    e_v_rule_cache_stats();
+    if (policy_validator_enabled())
+        e_v_rule_cache_stats();
 #endif
 }
