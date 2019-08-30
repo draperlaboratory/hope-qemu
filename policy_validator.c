@@ -39,7 +39,7 @@ bool policy_validator_commit(void)
     if (policy_validator_enabled())
         return e_v_commit();
 #endif
-    return true;
+    return false;
 }
 
 void policy_validator_violation_msg(char* dest, int n)
