@@ -27,6 +27,7 @@
 #include "qemu/error-report.h"
 #include "hw/qdev-properties.h"
 #include "migration/vmstate.h"
+#include "policy_validator.h"
 
 /* RISC-V CPU definitions */
 
@@ -409,6 +410,20 @@ static void riscv_cpu_realize(DeviceState *dev, Error **errp)
 
         set_misa(env, RVXLEN | target_misa);
     }
+
+    /* Set validator extension if requested */
+    if (policy_validator_enabled()) {
+       set_misa(env, env->misa | RVP);
+
+       qemu_printf("\nEnabling Validator Extension\n");
+    }
+
+    if (!cpu->cfg.ext_f) {
+       set_misa(env, env->misa & ~RVF);
+
+       qemu_printf("\nForce Disable Floating Point Extension\n");
+    }
+
 
     riscv_cpu_register_gdb_regs_for_features(cs);
 

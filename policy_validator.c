@@ -39,7 +39,7 @@ bool policy_validator_commit(void)
     if (policy_validator_enabled())
         return e_v_commit();
 #endif
-    return true;
+    return false;
 }
 
 void policy_validator_violation_msg(char* dest, int n)
@@ -110,6 +110,7 @@ void policy_validator_set_mem_watch(uint64_t addr)
 void policy_validator_rule_cache_stats(void)
 {
 #ifdef ENABLE_VALIDATOR
-    e_v_rule_cache_stats();
+    if (policy_validator_enabled())
+        e_v_rule_cache_stats();
 #endif
 }
