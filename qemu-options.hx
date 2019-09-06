@@ -5020,12 +5020,16 @@ SRST
 ERST
 
 DEF("policy-validator-cfg", HAS_ARG, QEMU_OPTION_policy_validator_cfg, \
-    "-policy-validator-cfg yaml-cfg=<path>\n"
-    "                set the policy validator yaml config file to <path>.\n",
+    "-policy-validator-cfg yaml-cfg=<path>[,enable=on|off]"
+    "                yaml-cfg=<path> set the policy validator yaml config file to <path>.\n"
+    "                enable=on|off Enable/Disable the policy validator.\n",
     QEMU_ARCH_RISCV)
 SRST
-``-policy-validator-cfg yaml-cfg=path``
-Policy validator yaml configuration.
+``-policy-validator-cfg yaml-cfg=path[,enable=on|off]``
+Policy validator configuration.
+
+``qemu-system-riscv32 --policy-validator-cfg yaml-cfg=validator_cfg.yml``
+``qemu-system-riscv32 --policy-validator-cfg yaml-cfg=validator_cfg.yml,enable=off``
 ERST
 
 HXCOMM This is the last statement. Insert new options before this line!
