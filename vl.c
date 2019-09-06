@@ -533,6 +533,9 @@ static QemuOptsList qemu_policy_validator_cfg_opts = {
         }, {
             .name = "yaml-cfg",
             .type = QEMU_OPT_STRING,
+        }, {
+            .name = "exc",
+            .type = QEMU_OPT_BOOL,
         },
         { /* end of list */ }
     },
@@ -3852,6 +3855,9 @@ int main(int argc, char **argv, char **envp)
                                                                    true));
 
                     set_policy_validator_cfg_path(qemu_opt_get(opts, "yaml-cfg"));
+
+                    set_policy_validator_exc(qemu_opt_get_bool(opts, "exc",
+                                                               false));
                 }
                 break;
             case QEMU_OPTION_nouserconfig:
