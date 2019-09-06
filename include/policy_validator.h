@@ -9,12 +9,16 @@
 
 typedef struct PolicyValidatorConfig {
     bool enabled;
+    bool exc;
     const char* validator_cfg_path;
 } PolicyValidatorConfig;
 
 
 void set_policy_validator_enabled(bool val);
 bool policy_validator_enabled(void);
+
+void set_policy_validator_exc(bool val);
+bool policy_validator_exc(void);
 
 void set_policy_validator_cfg_path(const char* path);
 
