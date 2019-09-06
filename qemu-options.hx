@@ -4821,13 +4821,19 @@ CN=laptop.example.com,O=Example Home,L=London,ST=London,C=GB
 ETEXI
 
 DEF("policy-validator-cfg", HAS_ARG, QEMU_OPTION_policy_validator_cfg,
-    "-policy-validator-cfg yaml-cfg=<path>\n"
-    "                set the policy validator yaml config file to <path>.\n",
+    "-policy-validator-cfg yaml-cfg=<path>[,enable=on|off]"
+    "                yaml-cfg=<path> set the policy validator yaml config file to <path>.\n"
+    "                enable=on|off Enable/Disable the policy validator.\n",
     QEMU_ARCH_RISCV)
 STEXI
 @item -policy-validator-cfg yaml-cfg=@var{path}
 @findex -policy-validator-cfg
-Policy validator yaml configuration.
+Policy validator configuration.
+
+@example
+qemu-system-riscv32 --policy-validator-cfg yaml-cfg=validator_cfg.yml
+qemu-system-riscv32 --policy-validator-cfg yaml-cfg=validator_cfg.yml,enable=off
+@end example
 ETEXI
 
 HXCOMM This is the last statement. Insert new options before this line!
