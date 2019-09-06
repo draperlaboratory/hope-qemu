@@ -36,6 +36,16 @@ void set_policy_validator_enabled(bool val)
     policy_validator.enabled = val;
 }
 
+bool policy_validator_exc(void)
+{
+    return policy_validator.exc;
+}
+
+void set_policy_validator_exc(bool val)
+{
+    policy_validator.exc = val;
+}
+
 void set_policy_validator_cfg_path(const char* path)
 {
     policy_validator.validator_cfg_path = path;

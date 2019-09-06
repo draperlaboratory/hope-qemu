@@ -5098,9 +5098,10 @@ SRST
 ERST
 
 DEF("policy-validator-cfg", HAS_ARG, QEMU_OPTION_policy_validator_cfg,
-    "-policy-validator-cfg yaml-cfg=<path>[,enable=on|off]"
+    "-policy-validator-cfg yaml-cfg=<path>[,enable=on|off][,exc=on|off]"
     "                yaml-cfg=<path> set the policy validator yaml config file to <path>.\n"
-    "                enable=on|off Enable/Disable the policy validator.\n",
+    "                enable=on|off Enable/Disable the policy validator.\n"
+    "                exc=on|off Generate exceptions on policy violations. (default = off)\n",
     QEMU_ARCH_RISCV)
 STEXI
 @item -policy-validator-cfg yaml-cfg=@var{path}
@@ -5110,6 +5111,7 @@ Policy validator configuration.
 @example
 qemu-system-riscv32 --policy-validator-cfg yaml-cfg=validator_cfg.yml
 qemu-system-riscv32 --policy-validator-cfg yaml-cfg=validator_cfg.yml,enable=off
+qemu-system-riscv32 --policy-validator-cfg yaml-cfg=validator_cfg.yml,exc=on
 @end example
 ETEXI
 
