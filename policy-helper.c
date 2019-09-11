@@ -15,6 +15,8 @@
 #ifdef ENABLE_VALIDATOR
 static bool skipped_commit = false;
 
+extern CPURISCVState* policy_validator_hack_env;
+
 void helper_validator_validate(CPURISCVState *env, target_ulong pc, uint32_t opcode)
 {
    /* PC altering instructions will skip the commit helper. */
@@ -25,6 +27,7 @@ void helper_validator_validate(CPURISCVState *env, target_ulong pc, uint32_t opc
    }
    skipped_commit = true;
 
+   policy_validator_hack_env = env;
    if (!e_v_validate(pc, opcode)) {
       char *msg = g_malloc(1024);
       policy_validator_violation_msg(msg, 1024);

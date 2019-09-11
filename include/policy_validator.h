@@ -21,6 +21,7 @@ void set_policy_validator_cfg_path(const char* path);
 const char* get_policy_validator_cfg_path(void);
 
 void set_policy_validator_metadata(void);
+void policy_validator_init(void);
 bool policy_validator_commit(void);
 
 void policy_validator_violation_msg(char* dest, int n);
