@@ -32,16 +32,6 @@ void set_policy_validator_metadata(void)
 #endif
 }
 
-
-bool policy_validator_commit(void)
-{
-#ifdef ENABLE_VALIDATOR
-    if (policy_validator_enabled())
-        return e_v_commit();
-#endif
-    return false;
-}
-
 void policy_validator_violation_msg(char* dest, int n)
 {
 #ifdef ENABLE_VALIDATOR
