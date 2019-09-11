@@ -94,19 +94,6 @@ static inline bool has_ext(DisasContext *ctx, uint32_t ext)
     return ctx->misa & ext;
 }
 
-//Policy validator functions that are dependent on target length
-void policy_validator_set_callbacks(target_ulong (*reg_reader)(uint32_t),
-                                    target_ulong (*mem_reader)(target_ulong));
-
-void policy_validator_set_callbacks(target_ulong (*reg_reader)(uint32_t),
-                                    target_ulong (*mem_reader)(target_ulong))
-{
-#ifdef ENABLE_VALIDATOR
-    if (policy_validator_enabled())
-        e_v_set_callbacks(reg_reader, mem_reader);
-#endif
-}
-
 static void generate_exception(DisasContext *ctx, int excp)
 {
     tcg_gen_movi_tl(cpu_pc, ctx->base.pc_next);
@@ -839,16 +826,11 @@ static bool riscv_tr_breakpoint_check(DisasContextBase *dcbase, CPUState *cpu,
     return true;
 }
 
-static CPURISCVState* policy_validator_hack_env;
-
 static void riscv_tr_translate_insn(DisasContextBase *dcbase, CPUState *cpu)
 {
     DisasContext *ctx = container_of(dcbase, DisasContext, base);
     CPURISCVState *env = cpu->env_ptr;
     uint16_t opcode16 = translator_lduw(env, ctx->base.pc_next);
-
-    policy_validator_hack_env = env;
-
 
     ctx->opcode = cpu_ldl_code(env, ctx->base.pc_next);
 
@@ -948,13 +930,6 @@ void gen_intermediate_code(CPUState *cs, TranslationBlock *tb, int max_insns)
 }
 
 
-static inline target_ulong policy_validator_reg_reader(uint32_t reg_num)
-{
-    if(reg_num == 0) return 0;
-
-    return policy_validator_hack_env->gpr[reg_num];
-}
-
 void riscv_translate_init(void)
 {
     int i;
@@ -981,6 +956,5 @@ void riscv_translate_init(void)
     load_val = tcg_global_mem_new(cpu_env, offsetof(CPURISCVState, load_val),
                              "load_val");
 
-    set_policy_validator_metadata();
-    policy_validator_set_callbacks(policy_validator_reg_reader, NULL);
+    policy_validator_init();
 }
