@@ -90,16 +90,6 @@ static inline bool has_ext(DisasContext *ctx, uint32_t ext)
 //Policy validator functions that are dependent on target length
 void policy_validator_set_callbacks(target_ulong (*reg_reader)(uint32_t),
                                     target_ulong (*mem_reader)(target_ulong));
-bool policy_validator_validate(target_ulong pc, uint32_t insn);
-
-bool policy_validator_validate(target_ulong pc, uint32_t insn)
-{
-#ifdef ENABLE_VALIDATOR
-    if (policy_validator_enabled())
-        return e_v_validate(pc, insn);
-#endif
-    return true;
-}
 
 void policy_validator_set_callbacks(target_ulong (*reg_reader)(uint32_t),
                                     target_ulong (*mem_reader)(target_ulong))
@@ -832,7 +822,6 @@ static CPURISCVState* policy_validator_hack_env;
 
 static void riscv_tr_translate_insn(DisasContextBase *dcbase, CPUState *cpu)
 {
-    static bool commit_pending = false;
     DisasContext *ctx = container_of(dcbase, DisasContext, base);
     CPURISCVState *env = cpu->env_ptr;
     uint16_t opcode16 = translator_lduw(env, ctx->base.pc_next);
@@ -841,27 +830,42 @@ static void riscv_tr_translate_insn(DisasContextBase *dcbase, CPUState *cpu)
 
 
     ctx->opcode = cpu_ldl_code(env, ctx->base.pc_next);
-    decode_opc(ctx);
 
-    if (commit_pending) {
-        commit_pending = false;
-        if(policy_validator_commit()) //hit a metadata watchpoint
-            gen_exception_debug();
-    }
+#ifdef ENABLE_VALIDATOR
+    /*
+       Use helper functions to call the validator from the IR.  The general
+       IR flow is then:
+       1.  Call validator.
+       2.  Execute Instruction.
+       3.  Check for validator breakpoint.
 
+       If the validation in 1 fails, an exception will be raised
+       skipping 1 and 2.
+    */
+
+    /* Validate */
     uint32_t pc = ctx->base.pc_next;
-    if (!(pc >= 0x1000 && pc < 0x2000)) { //reset ROM
-        if(!policy_validator_validate(pc, ctx->opcode)) {
-            char *msg = g_malloc(1024);
-            policy_validator_violation_msg(msg, 1024);
-            qemu_log("%s", msg);
-            qemu_log("MSG: End test.\n");
-            g_free(msg);
-            exit(1);
-        }
+    if (policy_validator_enabled()) {
+       if (!(pc >= 0x1000 && pc < 0x2000)) { //reset ROM
+          TCGv_i32 opcode = tcg_const_i32(ctx->opcode);
 
-        commit_pending = true;
+          tcg_gen_movi_tl(cpu_pc, pc);
+          gen_helper_validator_validate(cpu_env, cpu_pc, opcode);
+       }
     }
+#endif
+
+    /* Execute */
+    decode_opc(env, ctx, opcode16);
+
+#ifdef ENABLE_VALIDATOR
+    if (policy_validator_enabled()) {
+       /* Breakpoint Check */
+       if (!(pc >= 0x1000 && pc < 0x2000)) { //reset ROM
+          gen_helper_validator_commit(cpu_env);
+       }
+    }
+#endif
 
     ctx->base.pc_next = ctx->pc_succ_insn;
 
