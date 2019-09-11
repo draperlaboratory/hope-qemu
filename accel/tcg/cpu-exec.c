@@ -37,7 +37,6 @@
 #endif
 #include "sysemu/cpus.h"
 #include "sysemu/replay.h"
-#include "policy_validator.h"
 
 /* -icount align implementation. */
 
@@ -405,7 +404,7 @@ static inline TranslationBlock *tb_find(CPUState *cpu,
     uint32_t flags;
 
     tb = tb_lookup__cpu_state(cpu, &pc, &cs_base, &flags, cf_mask);
-    if (tb == NULL || policy_validator_enabled()) {
+    if (tb == NULL) {
         mmap_lock();
         tb = tb_gen_code(cpu, pc, cs_base, flags, cf_mask);
         mmap_unlock();
