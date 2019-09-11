@@ -1,3 +1,8 @@
+#ifdef ENABLE_VALIDATOR
+DEF_HELPER_3(validator_validate, void, env, tl, i32)
+DEF_HELPER_1(validator_commit, void, env)
+#endif
+
 /* Exceptions */
 DEF_HELPER_2(raise_exception, noreturn, env, i32)
 
