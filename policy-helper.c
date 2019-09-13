@@ -13,8 +13,18 @@
 #include "policy_validator.h"
 
 #ifdef ENABLE_VALIDATOR
+static bool skipped_commit = false;
+
 void helper_validator_validate(CPURISCVState *env, target_ulong pc, uint32_t opcode)
 {
+   /* PC altering instructions will skip the commit helper. */
+   if (skipped_commit) {
+      if (e_v_commit()) {
+         riscv_raise_exception(env, EXCP_DEBUG, GETPC());
+      }
+   }
+   skipped_commit = true;
+
    if (!e_v_validate(pc, opcode)) {
       char *msg = g_malloc(1024);
       policy_validator_violation_msg(msg, 1024);
@@ -27,6 +37,8 @@ void helper_validator_validate(CPURISCVState *env, target_ulong pc, uint32_t opc
 
 void helper_validator_commit(CPURISCVState *env)
 {
+   skipped_commit = false;
+
    if (e_v_commit()) {
       riscv_raise_exception(env, EXCP_DEBUG, GETPC());
    }
