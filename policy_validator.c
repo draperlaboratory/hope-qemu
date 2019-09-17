@@ -1,7 +1,18 @@
+#include "qemu/osdep.h"
+#include "cpu.h"
 #include "policy_validator.h"
 #include <stdio.h>
 
 static PolicyValidatorConfig policy_validator;
+
+CPURISCVState* policy_validator_hack_env;
+
+static inline target_ulong policy_validator_reg_reader(uint32_t reg_num)
+{
+    if(reg_num == 0) return 0;
+
+    return policy_validator_hack_env->gpr[reg_num];
+}
 
 bool policy_validator_enabled(void)
 {
@@ -32,14 +43,15 @@ void set_policy_validator_metadata(void)
 #endif
 }
 
-
-bool policy_validator_commit(void)
+void policy_validator_init(void)
 {
 #ifdef ENABLE_VALIDATOR
-    if (policy_validator_enabled())
-        return e_v_commit();
+    if (policy_validator_enabled()) {
+        e_v_set_metadata(policy_validator.validator_cfg_path);
+        e_v_set_callbacks(policy_validator_reg_reader,
+                          NULL);
+    }
 #endif
-    return false;
 }
 
 void policy_validator_violation_msg(char* dest, int n)
