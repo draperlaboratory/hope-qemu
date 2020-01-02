@@ -1,17 +1,25 @@
 #include "qemu/osdep.h"
 #include "cpu.h"
+#include "tcg-op.h"
 #include "policy_validator.h"
 #include <stdio.h>
 
 static PolicyValidatorConfig policy_validator;
 
 CPURISCVState* policy_validator_hack_env;
+CPUState* policy_validator_hack_cpu_state;
 
 static inline target_ulong policy_validator_reg_reader(uint32_t reg_num)
 {
     if(reg_num == 0) return 0;
 
     return policy_validator_hack_env->gpr[reg_num];
+}
+
+static inline target_ulong policy_validator_address_fixer(uint32_t vaddr)
+{
+    CPUClass *cc = CPU_GET_CLASS(policy_validator_hack_cpu_state);
+    return (cc->get_phys_page_debug(policy_validator_hack_cpu_state, vaddr)|(vaddr & (qemu_real_host_page_size-1)));
 }
 
 bool policy_validator_enabled(void)
@@ -49,7 +57,7 @@ void policy_validator_init(void)
     if (policy_validator_enabled()) {
         e_v_set_metadata(policy_validator.validator_cfg_path);
         e_v_set_callbacks(policy_validator_reg_reader,
-                          NULL);
+                          NULL, policy_validator_address_fixer);
     }
 #endif
 }

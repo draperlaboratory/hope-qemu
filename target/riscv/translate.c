@@ -821,7 +821,9 @@ static void riscv_tr_translate_insn(DisasContextBase *dcbase, CPUState *cpu)
           TCGv_i32 opcode = tcg_const_i32(ctx->opcode);
 
           tcg_gen_movi_tl(cpu_pc, pc);
-          gen_helper_validator_validate(cpu_env, cpu_pc, opcode);
+          TCGv_ptr cpu_state_ptr = tcg_const_ptr(cpu);
+          gen_helper_validator_validate(cpu_env, cpu_pc, opcode, cpu_state_ptr);
+          tcg_temp_free_ptr(cpu_state_ptr);
        }
     }
 #endif
