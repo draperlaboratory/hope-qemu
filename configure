@@ -8506,11 +8506,8 @@ if test "$TARGET_ARCH" = "s390x" && test "$target_softmmu" = "yes" && \
     fi
 fi
 
-# Currently the external validator only supports riscv32
-if test "$target_name" = "riscv32"; then :
-    if test -n "$validator_include"; then :
-        cflags="-DENABLE_VALIDATOR $cflags"
-    fi
+if test -n "$validator_include"; then
+    cflags="-DENABLE_VALIDATOR $cflags"
 fi
 
 echo "QEMU_LDFLAGS+=$ldflags" >> $config_target_mak
