@@ -28,7 +28,7 @@ void helper_validator_validate(CPURISCVState *env, target_ulong pc, uint32_t opc
    skipped_commit = true;
 
    policy_validator_hack_env = env;
-   if (!e_v_validate(pc, opcode)) {
+   if (!e_v_validate((uint64_t)pc, opcode)) {
       char *msg = g_malloc(1024);
       policy_validator_violation_msg(msg, 1024);
       qemu_log("%s", msg);
