@@ -4,11 +4,6 @@
 #include <stdbool.h>
 #include <stdint.h>
 #ifdef ENABLE_VALIDATOR
-
-#if defined(TARGET_RISCV64)
-#define RV64_VALIDATOR
-#endif
-
 #include "qemu_interface.h"
 #endif
 
