@@ -4,7 +4,7 @@
 
 ISP_PREFIX ?= /opt/isp/
 
-CONFIGURE_OPTIONS := --target-list=riscv32-linux-user,riscv32-softmmu,riscv64-linux-user,riscv64-softmmu
+CONFIGURE_OPTIONS := --target-list=riscv32-softmmu,riscv64-softmmu
 CONFIGURE_OPTIONS += --with-validator-lib=$(ISP_PREFIX)/lib
 CONFIGURE_OPTIONS += --with-validator-include=$(ISP_PREFIX)/include
 CONFIGURE_OPTIONS += --prefix=$(ISP_PREFIX)
