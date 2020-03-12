@@ -7634,6 +7634,12 @@ if test -n "$gdb_bin" ; then
     echo "HAVE_GDB_BIN=$gdb_bin" >> $config_host_mak
 fi
 
+if test -n "$validator_lib"; then :
+  if test -n "$validator_include}"; then :
+    echo "CONFIG_VALIDATOR=y" >> $config_host_mak
+  fi
+fi
+
 if test "$tcg_interpreter" = "yes"; then
   QEMU_INCLUDES="-iquote \$(SRC_PATH)/tcg/tci $QEMU_INCLUDES"
 elif test "$ARCH" = "sparc64" ; then
