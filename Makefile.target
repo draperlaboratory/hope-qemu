@@ -175,7 +175,11 @@ generated-files-y += config-devices.h
 
 endif # CONFIG_SOFTMMU
 
+ifdef CONFIG_VALIDATOR
+LIBS := $(libs_validator) $(LIBS)
+
 obj-y += policy_validator.o policy-helper.o
+endif # CONFIG_VALIDATOR
 
 dummy := $(call unnest-vars,,obj-y)
 all-obj-y := $(obj-y)

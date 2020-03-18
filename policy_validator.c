@@ -7,11 +7,11 @@ static PolicyValidatorConfig policy_validator;
 
 CPURISCVState* policy_validator_hack_env;
 
-static inline target_ulong policy_validator_reg_reader(uint32_t reg_num)
+static inline uint64_t policy_validator_reg_reader(uint32_t reg_num)
 {
     if(reg_num == 0) return 0;
 
-    return policy_validator_hack_env->gpr[reg_num];
+    return (uint64_t)policy_validator_hack_env->gpr[reg_num];
 }
 
 bool policy_validator_enabled(void)
