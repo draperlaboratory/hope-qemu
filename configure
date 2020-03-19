@@ -6316,7 +6316,7 @@ echo_version() {
 
 if test -n "$validator_lib"; then :
    QEMU_LDFLAGS="-L$validator_lib $QEMU_LDFLAGS"
-   LIBS="$policy_engine_lib $LIBS"
+   LIBS="$libs_validator $LIBS"
 fi
 
 if test -n "$validator_include}"; then :
