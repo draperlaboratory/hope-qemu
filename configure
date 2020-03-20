@@ -6319,7 +6319,7 @@ if test -n "$validator_lib"; then :
    LIBS="$libs_validator $LIBS"
 fi
 
-if test -n "$validator_include}"; then :
+if test -n "$validator_include"; then :
    QEMU_CFLAGS="-I$validator_include $QEMU_CFLAGS"
 fi
 
