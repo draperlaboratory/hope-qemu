@@ -14,7 +14,7 @@ all: build/Makefile
 
 build/Makefile:
 	$(MAKE) clean
-	mkdir build
+	mkdir -p build
 	cd build; ../configure $(CONFIGURE_OPTIONS)
 
 install:
