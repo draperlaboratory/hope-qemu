@@ -815,13 +815,15 @@ static void riscv_tr_translate_insn(DisasContextBase *dcbase, CPUState *cpu)
     */
 
     /* Validate */
-    uint32_t pc = ctx->base.pc_next;
+    target_ulong pc = ctx->base.pc_next;
     if (policy_validator_enabled()) {
        if (!(pc >= 0x1000 && pc < 0x2000)) { //reset ROM
           TCGv_i32 opcode = tcg_const_i32(ctx->opcode);
 
           tcg_gen_movi_tl(cpu_pc, pc);
-          gen_helper_validator_validate(cpu_env, cpu_pc, opcode);
+          TCGv_ptr cpu_state_ptr = tcg_const_ptr(cpu);
+          gen_helper_validator_validate(cpu_env, cpu_pc, opcode, cpu_state_ptr);
+          tcg_temp_free_ptr(cpu_state_ptr);
        }
     }
 #endif
