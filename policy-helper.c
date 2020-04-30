@@ -16,10 +16,12 @@
 static bool skipped_commit = false;
 
 extern CPURISCVState* policy_validator_hack_env;
+extern CPUState* policy_validator_hack_cpu_state;
 
-void helper_validator_validate(CPURISCVState *env, target_ulong pc, uint32_t opcode)
+void helper_validator_validate(CPURISCVState *env, target_ulong pc, uint32_t opcode, void* cpu_ptr)
 {
    /* PC altering instructions will skip the commit helper. */
+   CPUState* cpu_state = (CPUState*) cpu_ptr;
    if (skipped_commit) {
       if (e_v_commit()) {
          riscv_raise_exception(env, EXCP_DEBUG, GETPC());
@@ -28,6 +30,7 @@ void helper_validator_validate(CPURISCVState *env, target_ulong pc, uint32_t opc
    skipped_commit = true;
 
    policy_validator_hack_env = env;
+   policy_validator_hack_cpu_state = cpu_state;
    if (!e_v_validate((uint64_t)pc, opcode)) {
       char *msg = g_malloc(1024);
       policy_validator_violation_msg(msg, 1024);
