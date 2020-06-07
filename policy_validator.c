@@ -126,3 +126,10 @@ void policy_validator_rule_cache_stats(void)
         e_v_rule_cache_stats();
 #endif
 }
+
+void policy_validator_terminate(void){
+#ifdef ENABLE_VALIDATOR
+    if (policy_validator_enabled())
+        e_v_terminate();
+#endif
+}
