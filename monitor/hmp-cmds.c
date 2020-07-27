@@ -2999,7 +2999,7 @@ void hmp_reg_m(Monitor *mon, const QDict *qdict)
     char *msg = g_malloc(1024);
     policy_validator_get_reg_tag(msg, 1024, reg_num);
 
-    monitor_printf(mon, " %s \n", msg);
+    monitor_printf(mon, "Reg: %s \n", msg);
     g_free(msg);
 }
 
@@ -3041,7 +3041,7 @@ void hmp_mem_m(Monitor *mon, const QDict *qdict)
     char *msg = g_malloc(1024);
     policy_validator_get_mem_tag(msg, 1024, addr);
 
-    monitor_printf(mon, " %s \n", msg);
+    monitor_printf(mon, "Mem: %s \n", msg);
     g_free(msg);
 }
 

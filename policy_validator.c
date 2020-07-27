@@ -1,4 +1,5 @@
 #include "qemu/osdep.h"
+#include "qemu/log.h"
 #include "cpu.h"
 #include "tcg-op.h"
 #include "policy_validator.h"
@@ -21,10 +22,17 @@ static inline uint64_t policy_validator_address_fixer(uint64_t vaddr)
     CPUClass *cc = CPU_GET_CLASS(policy_validator_hack_cpu_state);
     uint64_t page_addr = cc->get_phys_page_debug(policy_validator_hack_cpu_state, vaddr);
     uint64_t page_offset = vaddr & (qemu_real_host_page_size-1);
-    if (page_addr == -1)
+    if (vaddr == 0x103dc) {
+      printf("vaddr: %lx, paddr: %lx\n", vaddr, page_addr | page_offset);
+    }
+    if (page_addr == -1) {
+        if (vaddr == 0x270568) {
+          printf("Failed to get page addr for %lx\n", vaddr);
+        }
         return vaddr;
+    }
     return page_addr | page_offset;
- }
+}
 
 bool policy_validator_enabled(void)
 {

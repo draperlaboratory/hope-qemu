@@ -269,10 +269,10 @@ restart:
                    (!sum || access_type == MMU_INST_FETCH))) {
             /* User PTE flags when not U mode and mstatus.SUM is not set,
                or the access type is an instruction fetch */
+            // XXX: This is where QEMU fails to translate addresses in load_elf_binary
             return TRANSLATE_FAIL;
         } else if (!(pte & PTE_U) && (mode != PRV_S)) {
             /* Supervisor PTE flags when not S mode */
-            return TRANSLATE_FAIL;
         } else if (ppn & ((1ULL << ptshift) - 1)) {
             /* Misaligned PPN */
             return TRANSLATE_FAIL;

@@ -878,9 +878,9 @@ static QDict *monitor_parse_arguments(Monitor *mon,
                 }
                 /* Check if 'i' is greater than 32-bit */
                 if ((c == 'i') && ((val >> 32) & 0xffffffff)) {
-                    monitor_printf(mon, "\'%s\' has failed: ", cmd->name);
-                    monitor_printf(mon, "integer is for 32-bit values\n");
-                    goto fail;
+                    /* monitor_printf(mon, "\'%s\' has failed: ", cmd->name); */
+                    /* monitor_printf(mon, "integer is for 32-bit values\n"); */
+                    /* goto fail; */
                 } else if (c == 'M') {
                     if (val < 0) {
                         monitor_printf(mon, "enter a positive value\n");
