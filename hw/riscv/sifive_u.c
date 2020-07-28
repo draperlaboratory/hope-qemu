@@ -157,22 +157,12 @@ static void create_fdt(SiFiveUState *s, const struct MemmapEntry *memmap,
     qemu_fdt_setprop_cell(fdt, "/cpus", "#address-cells", 0x1);
 
     for (cpu = ms->smp.cpus - 1; cpu >= 0; cpu--) {
-        int cpu_phandle = phandle++;
+	int cpu_phandle = phandle++;
         nodename = g_strdup_printf("/cpus/cpu@%d", cpu);
         char *intc = g_strdup_printf("/cpus/cpu@%d/interrupt-controller", cpu);
-        char *isa;
+        char *isa = riscv_isa_string(&s->soc.u_cpus.harts[cpu]);
         qemu_fdt_add_subnode(fdt, nodename);
-        /* cpu 0 is the management hart that does not have mmu */
-        if (cpu != 0) {
-#if defined(TARGET_RISCV32)
-            qemu_fdt_setprop_string(fdt, nodename, "mmu-type", "riscv,sv32");
-#else
-            qemu_fdt_setprop_string(fdt, nodename, "mmu-type", "riscv,sv48");
-#endif
-            isa = riscv_isa_string(&s->soc.u_cpus.harts[cpu - 1]);
-        } else {
-            isa = riscv_isa_string(&s->soc.e_cpus.harts[0]);
-        }
+        qemu_fdt_setprop_string(fdt, nodename, "mmu-type", "riscv,sv48");
         qemu_fdt_setprop_string(fdt, nodename, "riscv,isa", isa);
         qemu_fdt_setprop_string(fdt, nodename, "compatible", "riscv");
         qemu_fdt_setprop_string(fdt, nodename, "status", "okay");
@@ -238,21 +228,15 @@ static void create_fdt(SiFiveUState *s, const struct MemmapEntry *memmap,
     g_free(nodename);
 
     plic_phandle = phandle++;
-    cells =  g_new0(uint32_t, ms->smp.cpus * 4 - 2);
+    cells =  g_new0(uint32_t, ms->smp.cpus * 4);
     for (cpu = 0; cpu < ms->smp.cpus; cpu++) {
         nodename =
             g_strdup_printf("/cpus/cpu@%d/interrupt-controller", cpu);
         uint32_t intc_phandle = qemu_fdt_get_phandle(fdt, nodename);
-        /* cpu 0 is the management hart that does not have S-mode */
-        if (cpu == 0) {
-            cells[0] = cpu_to_be32(intc_phandle);
-            cells[1] = cpu_to_be32(IRQ_M_EXT);
-        } else {
-            cells[cpu * 4 - 2] = cpu_to_be32(intc_phandle);
-            cells[cpu * 4 - 1] = cpu_to_be32(IRQ_M_EXT);
-            cells[cpu * 4 + 0] = cpu_to_be32(intc_phandle);
-            cells[cpu * 4 + 1] = cpu_to_be32(IRQ_S_EXT);
-        }
+        cells[cpu * 4 + 0] = cpu_to_be32(intc_phandle);
+        cells[cpu * 4 + 1] = cpu_to_be32(IRQ_M_EXT);
+        cells[cpu * 4 + 2] = cpu_to_be32(intc_phandle);
+        cells[cpu * 4 + 3] = cpu_to_be32(IRQ_S_EXT);
         g_free(nodename);
     }
     nodename = g_strdup_printf("/soc/interrupt-controller@%lx",
@@ -262,7 +246,7 @@ static void create_fdt(SiFiveUState *s, const struct MemmapEntry *memmap,
     qemu_fdt_setprop_string(fdt, nodename, "compatible", "riscv,plic0");
     qemu_fdt_setprop(fdt, nodename, "interrupt-controller", NULL, 0);
     qemu_fdt_setprop(fdt, nodename, "interrupts-extended",
-        cells, (ms->smp.cpus * 4 - 2) * sizeof(uint32_t));
+        cells, (ms->smp.cpus * 4) * sizeof(uint32_t));
     qemu_fdt_setprop_cells(fdt, nodename, "reg",
         0x0, memmap[SIFIVE_U_PLIC].base,
         0x0, memmap[SIFIVE_U_PLIC].size);
@@ -560,8 +544,8 @@ static void sifive_u_machine_class_init(ObjectClass *oc, void *data)
     mc->desc = "RISC-V Board compatible with SiFive U SDK";
     mc->init = sifive_u_machine_init;
     mc->max_cpus = SIFIVE_U_MANAGEMENT_CPU_COUNT + SIFIVE_U_COMPUTE_CPU_COUNT;
-    mc->min_cpus = SIFIVE_U_MANAGEMENT_CPU_COUNT + 1;
-    mc->default_cpus = mc->min_cpus;
+    mc->min_cpus = 1;
+    mc->default_cpus = 1;
 }
 
 static const TypeInfo sifive_u_machine_typeinfo = {
@@ -584,22 +568,22 @@ static void sifive_u_soc_instance_init(Object *obj)
     MachineState *ms = MACHINE(qdev_get_machine());
     SiFiveUSoCState *s = RISCV_U_SOC(obj);
 
-    object_initialize_child(obj, "e-cluster", &s->e_cluster, TYPE_CPU_CLUSTER);
-    qdev_prop_set_uint32(DEVICE(&s->e_cluster), "cluster-id", 0);
-
-    object_initialize_child(OBJECT(&s->e_cluster), "e-cpus", &s->e_cpus,
-                            TYPE_RISCV_HART_ARRAY);
-    qdev_prop_set_uint32(DEVICE(&s->e_cpus), "num-harts", 1);
-    qdev_prop_set_uint32(DEVICE(&s->e_cpus), "hartid-base", 0);
-    qdev_prop_set_string(DEVICE(&s->e_cpus), "cpu-type", SIFIVE_E_CPU);
+//     object_initialize_child(obj, "e-cluster", &s->e_cluster, TYPE_CPU_CLUSTER);
+//     qdev_prop_set_uint32(DEVICE(&s->e_cluster), "cluster-id", 0);
+// 
+//     object_initialize_child(OBJECT(&s->e_cluster), "e-cpus", &s->e_cpus,
+//                             TYPE_RISCV_HART_ARRAY);
+//     qdev_prop_set_uint32(DEVICE(&s->e_cpus), "num-harts", 1);
+//     qdev_prop_set_uint32(DEVICE(&s->e_cpus), "hartid-base", 0);
+//     qdev_prop_set_string(DEVICE(&s->e_cpus), "cpu-type", SIFIVE_E_CPU);
 
     object_initialize_child(obj, "u-cluster", &s->u_cluster, TYPE_CPU_CLUSTER);
-    qdev_prop_set_uint32(DEVICE(&s->u_cluster), "cluster-id", 1);
+    qdev_prop_set_uint32(DEVICE(&s->u_cluster), "cluster-id", 0);
 
     object_initialize_child(OBJECT(&s->u_cluster), "u-cpus", &s->u_cpus,
                             TYPE_RISCV_HART_ARRAY);
-    qdev_prop_set_uint32(DEVICE(&s->u_cpus), "num-harts", ms->smp.cpus - 1);
-    qdev_prop_set_uint32(DEVICE(&s->u_cpus), "hartid-base", 1);
+    qdev_prop_set_uint32(DEVICE(&s->u_cpus), "num-harts", ms->smp.cpus);
+    qdev_prop_set_uint32(DEVICE(&s->u_cpus), "hartid-base", 0);
     qdev_prop_set_string(DEVICE(&s->u_cpus), "cpu-type", SIFIVE_U_CPU);
 
     object_initialize_child(obj, "prci", &s->prci, TYPE_SIFIVE_U_PRCI);
@@ -621,7 +605,7 @@ static void sifive_u_soc_realize(DeviceState *dev, Error **errp)
     int i;
     NICInfo *nd = &nd_table[0];
 
-    sysbus_realize(SYS_BUS_DEVICE(&s->e_cpus), &error_abort);
+//     sysbus_realize(SYS_BUS_DEVICE(&s->e_cpus), &error_abort);
     sysbus_realize(SYS_BUS_DEVICE(&s->u_cpus), &error_abort);
     /*
      * The cluster must be realized after the RISC-V hart array container,
@@ -629,7 +613,7 @@ static void sifive_u_soc_realize(DeviceState *dev, Error **errp)
      * CPU must exist and have been parented into the cluster before the
      * cluster is realized.
      */
-    qdev_realize(DEVICE(&s->e_cluster), NULL, &error_abort);
+//     qdev_realize(DEVICE(&s->e_cluster), NULL, &error_abort);
     qdev_realize(DEVICE(&s->u_cluster), NULL, &error_abort);
 
     /* boot rom */
@@ -661,7 +645,7 @@ static void sifive_u_soc_realize(DeviceState *dev, Error **errp)
             strncat(plic_hart_config, "," SIFIVE_U_PLIC_HART_CONFIG,
                     plic_hart_config_len);
         } else {
-            strncat(plic_hart_config, "M", plic_hart_config_len);
+            strncat(plic_hart_config, "MS", plic_hart_config_len);
         }
         plic_hart_config_len -= (strlen(SIFIVE_U_PLIC_HART_CONFIG) + 1);
     }
