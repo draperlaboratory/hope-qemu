@@ -35,9 +35,7 @@ typedef struct SiFiveUSoCState {
     DeviceState parent_obj;
 
     /*< public >*/
-    CPUClusterState e_cluster;
     CPUClusterState u_cluster;
-    RISCVHartArrayState e_cpus;
     RISCVHartArrayState u_cpus;
     DeviceState *plic;
     SiFiveUPRCIState prci;
@@ -118,7 +116,7 @@ enum {
     MSEL_L2LIM_QSPI2_SD = 11
 };
 
-#define SIFIVE_U_MANAGEMENT_CPU_COUNT   1
+#define SIFIVE_U_MANAGEMENT_CPU_COUNT   0
 #define SIFIVE_U_COMPUTE_CPU_COUNT      4
 
 #define SIFIVE_U_PLIC_HART_CONFIG "MS"
