@@ -1863,11 +1863,10 @@ ERST
         .cmd        = hmp_env_mw,
     },
 
-STEXI
-@item env-mw
-@findex env-mw
-Command to set a watch-point on any change to the env metadata.
-ETEXI
+SRST
+``env-mw``
+  Command to set a watch-point on any change to the env metadata.
+ERST
 
     {
         .name       = "reg-m",
@@ -1890,11 +1889,10 @@ ERST
         .cmd        = hmp_reg_mw,
     },
 
-STEXI
-@item reg-mw @var{num}
-@findex reg-mw
-Command to set a watch-point on any change to the metadata for register @var{num}.
-ETEXI
+SRST
+``reg-mw`` *num&
+  Command to set a watch-point on any change to the metadata for register *num*.
+ERST
 
     {
         .name       = "csr-m",
@@ -1917,12 +1915,10 @@ ERST
         .help       = "set watch on the metadata for csr register num",
         .cmd        = hmp_csr_mw,
     },
-
-STEXI
-@item csr-mw @var{num}
-@findex csr-mw
-Command to set a watchpoint on the metadata for csr register @var{num}.
-ETEXI
+SRST
+``csr-mw`` *num*
+  Command to set a watchpoint on the metadata for csr register @var{num}.
+ERST
 
     {
         .name       = "mem-m",
