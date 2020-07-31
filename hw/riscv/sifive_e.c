@@ -277,22 +277,22 @@ static void sifive_e_soc_realize(DeviceState *dev, Error **errp)
         qemu_check_nic_model(nd_table, TYPE_CADENCE_GEM);
         qdev_set_nic_properties(DEVICE(&s->gem), nd_table);
     }
-    object_property_set_int(OBJECT(&s->gem), GEM_REVISION, "revision",
+    object_property_set_int(OBJECT(&s->gem), "revision", GEM_REVISION,
                             &error_abort);
     object_property_set_bool(OBJECT(&s->gem), true, "realized", &error_abort);
     sysbus_mmio_map(SYS_BUS_DEVICE(&s->gem), 0, memmap[SIFIVE_E_GEM].base);
     sysbus_connect_irq(SYS_BUS_DEVICE(&s->gem), 0,
                        qdev_get_gpio_in(DEVICE(s->plic), SIFIVE_E_GEM_IRQ));
 #else
-    s->gem = (CadenceGEMState*)qdev_create(NULL, TYPE_CADENCE_GEM);
+    s->gem = (CadenceGEMState*)qdev_new(TYPE_CADENCE_GEM);
 
     if (nd_table[0].used) {
         qemu_check_nic_model(&nd_table[0], TYPE_CADENCE_GEM);
         qdev_set_nic_properties(DEVICE(s->gem), &nd_table[0]);
     }
-    object_property_set_int(OBJECT(s->gem), GEM_REVISION, "revision",
+    object_property_set_int(OBJECT(s->gem), "revision", GEM_REVISION,
                             &error_abort);
-    qdev_init_nofail(DEVICE(s->gem));
+    sysbus_realize_and_unref(SYS_BUS_DEVICE(s->gem), &error_fatal);
     sysbus_mmio_map(SYS_BUS_DEVICE(s->gem), 0, memmap[SIFIVE_E_GEM].base);
 
     sysbus_connect_irq(SYS_BUS_DEVICE(s->gem), 0,
