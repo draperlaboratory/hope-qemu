@@ -81,3 +81,8 @@ DEF_HELPER_2(mret, tl, env, tl)
 DEF_HELPER_1(wfi, void, env)
 DEF_HELPER_1(tlb_flush, void, env)
 #endif
+
+/* Validator helpers */
+DEF_HELPER_1(policy_validator_loader_hook, void, env)
+DEF_HELPER_1(policy_validator_entity_tag_count_hook, void, env)
+DEF_HELPER_1(policy_validator_entity_tag_hook, void, env)

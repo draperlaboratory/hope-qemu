@@ -1,7 +1,10 @@
 #include "qemu/osdep.h"
+#include "qemu/log.h"
 #include "cpu.h"
+#include "tcg.h"
 #include "tcg-op.h"
 #include "policy_validator.h"
+#include "exec/exec-all.h"
 #include <stdio.h>
 
 static PolicyValidatorConfig policy_validator;
@@ -147,4 +150,45 @@ void policy_validator_rule_cache_stats(void)
     if (policy_validator_enabled())
         e_v_rule_cache_stats();
 #endif
+}
+
+// Apply <tag> to the range <start>-<end>
+void helper_policy_validator_loader_hook(CPUArchState *env) {
+  CPURISCVState *arch = env;
+  uint64_t start;
+  uint64_t end;
+  uint64_t start_fixed;
+  uint64_t end_fixed;
+  uint64_t tag;
+
+  start = arch->gpr[10]; // a0
+  end = arch->gpr[11]; // a1
+  tag = arch->gpr[12]; // a2
+
+  start_fixed = policy_validator_address_fixer(start);
+  end_fixed = policy_validator_address_fixer(end);
+
+  /* printf("Tagging %lx(%lx) - %lx(%lx) with %lu\n", start, start_fixed, end, end_fixed, tag); */
+  e_v_load_tag_range(start_fixed, end_fixed, tag);
+}
+
+// Get the number of tags for an entity corresponding to <id>
+void helper_policy_validator_entity_tag_count_hook(CPUArchState *env) {
+  CPURISCVState *arch = env;
+  uint64_t id;
+
+  id = arch->gpr[10]; // a0
+
+  arch->gpr[10] = e_v_get_entity_tag_count(id);
+}
+
+void helper_policy_validator_entity_tag_hook(CPUArchState *env) {
+  CPURISCVState *arch = env;
+  uint64_t id;
+  uint64_t index;
+
+  id = arch->gpr[10]; // a0
+  index = arch->gpr[11]; // a1
+
+  arch->gpr[10] = e_v_get_entity_tag(id, index);
 }

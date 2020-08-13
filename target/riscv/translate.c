@@ -816,6 +816,13 @@ static void riscv_tr_translate_insn(DisasContextBase *dcbase, CPUState *cpu)
 
     /* Validate */
     target_ulong pc = ctx->base.pc_next;
+    uint64_t _pc = pc;
+    static uint64_t tag_kernel_range_pc = 0;
+    static uint64_t tag_range_pc = 0;
+    static uint64_t entity_tag_count_pc = 0;
+    static uint64_t entity_tag_pc = 0;
+    static bool hooks_set = false;
+
     if (policy_validator_enabled()) {
        if (!(pc >= 0x1000 && pc < 0x2000)) { //reset ROM
           TCGv_i32 opcode = tcg_const_i32(ctx->opcode);
@@ -824,6 +831,30 @@ static void riscv_tr_translate_insn(DisasContextBase *dcbase, CPUState *cpu)
           TCGv_ptr cpu_state_ptr = tcg_const_ptr(cpu);
           gen_helper_validator_validate(cpu_env, cpu_pc, opcode, cpu_state_ptr);
           tcg_temp_free_ptr(cpu_state_ptr);
+       }
+
+       if (!hooks_set) {
+         tag_range_pc = e_v_get_hook_address("tag_range");
+         tag_kernel_range_pc = e_v_get_hook_address("tag_kernel_range");
+         entity_tag_count_pc = e_v_get_hook_address("entity_tag_count");
+         entity_tag_pc = e_v_get_hook_address("entity_tag");
+         printf("tag_range_pc: %lx\n", tag_range_pc);
+         printf("tag_kernel_range_pc: %lx\n", tag_kernel_range_pc);
+         printf("entity_tag_pc: %lx\n", entity_tag_pc);
+         printf("entity_tag_count_pc: %lx\n", entity_tag_count_pc);
+         hooks_set = true;
+       }
+
+       if (_pc == tag_range_pc || _pc == tag_kernel_range_pc) {
+          gen_helper_policy_validator_loader_hook(cpu_env);
+       }
+
+       if (_pc == entity_tag_count_pc) {
+          gen_helper_policy_validator_entity_tag_count_hook(cpu_env);
+       }
+
+       if (_pc == entity_tag_pc) {
+          gen_helper_policy_validator_entity_tag_hook(cpu_env);
        }
     }
 #endif
