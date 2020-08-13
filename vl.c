@@ -34,6 +34,8 @@
 #include "sysemu/tcg.h"
 #include "policy_validator.h"
 
+#include "qemu_interface.h"
+
 #ifdef CONFIG_SDL
 #if defined(__APPLE__) || defined(main)
 #include <SDL.h>
@@ -3858,6 +3860,12 @@ int main(int argc, char **argv, char **envp)
 
                     set_policy_validator_exc(qemu_opt_get_bool(opts, "exc",
                                                                false));
+                }
+                break;
+            case QEMU_OPTION_policy_hook:
+                if (!e_v_set_hook(optarg)) {
+                  error_report("Failed to create policy hook with argument '%s'", optarg);
+                  exit(1);
                 }
                 break;
             case QEMU_OPTION_nouserconfig:

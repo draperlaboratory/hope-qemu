@@ -4838,6 +4838,16 @@ qemu-system-riscv32 --policy-validator-cfg yaml-cfg=validator_cfg.yml,exc=on
 @end example
 ETEXI
 
+DEF("policy-hook", HAS_ARG, QEMU_OPTION_policy_hook,
+    "-policy-hook <name>=<address>\n"
+    "Set the hook with <name> to PC <address>",
+    QEMU_ARCH_RISCV)
+STEXI
+@item -policy-hook <name>=<address>
+@findex -policy-hook
+Policy hook setter.
+ETEXI
+
 HXCOMM This is the last statement. Insert new options before this line!
 STEXI
 @end table
