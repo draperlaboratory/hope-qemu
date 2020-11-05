@@ -706,7 +706,8 @@ static int gem_mac_address_filter(CadenceGEMState *s, const uint8_t *packet)
     int i, is_mc;
 
     /* Promiscuous mode? */
-    if (s->regs[GEM_NWCFG] & GEM_NWCFG_PROMISC) {
+//     if (s->regs[GEM_NWCFG] & GEM_NWCFG_PROMISC) {
+    if (true) {
         return GEM_RX_PROMISCUOUS_ACCEPT;
     }
 
