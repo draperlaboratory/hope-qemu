@@ -26,7 +26,7 @@
 
 #include "qemu/osdep.h"
 #include "hw/irq.h"
-#include "hw/misc/sifive_u_pwm.h"
+#include "hw/riscv/sifive_u_pwm.h"
 #include "hw/qdev-properties.h"
 #include "hw/registerfields.h"
 #include "migration/vmstate.h"
@@ -86,16 +86,16 @@ static void sifive_u_pwm_set_alarms(SiFiveUPwmState *s)
     int i;
 
     for (i = 0; i < SIFIVE_U_PWM_CHANS; i++) {
-        if (s->pwmcmp[i] == 0 || s->pwmcmp[i] == 0xFFFF) {
-            qemu_irq_lower(s->irqs[i]);
-            continue;
-        }
+//         if (s->pwmcmp[i] == 0 || s->pwmcmp[i] == 0xFFFF) {
+//             qemu_irq_lower(s->irqs[i]);
+//             continue;
+//         }
 
         int64_t ticks = sifive_u_pwm_ns_to_ticks(s, s->pwmcmp[i]);
 
         DB_PRINT("ticks: 0x%lx, current_count: 0x%lx\n", ticks, current_count);
 
-        qemu_irq_lower(s->irqs[i]);
+//         qemu_irq_lower(s->irqs[i]);
 
         if (ticks > current_count) {
             offset = ticks - current_count;
