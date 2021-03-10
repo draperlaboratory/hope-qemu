@@ -408,9 +408,9 @@ _eth_get_rss_ex_dst_addr(const struct iovec *pkt, int pkt_frags,
     size_t input_size = iov_size(pkt, pkt_frags);
     size_t bytes_read;
 
-    if (input_size < ext_hdr_offset + sizeof(rt_hdr) + sizeof(*dst_addr)) {
-        return false;
-    }
+        bytes_read = iov_to_buf(pkt, pkt_frags,
+                                rthdr_offset + sizeof(*rthdr),
+                                dst_addr, sizeof(*dst_addr));
 
     bytes_read = iov_to_buf(pkt, pkt_frags, ext_hdr_offset,
                             &rt_hdr, sizeof(rt_hdr));
