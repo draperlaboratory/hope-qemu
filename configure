@@ -500,17 +500,16 @@ live_block_migration="yes"
 numa=""
 tcmalloc="no"
 jemalloc="no"
-replication="yes"
-bochs="yes"
-cloop="yes"
-dmg="yes"
-qcow1="yes"
-vdi="yes"
-vvfat="yes"
-qed="yes"
-parallels="yes"
-sheepdog="yes"
-libxml2=""
+replication=${default_feature:-yes}
+bochs=${default_feature:-yes}
+cloop=${default_feature:-yes}
+dmg=${default_feature:-yes}
+qcow1=${default_feature:-yes}
+vdi=${default_feature:-yes}
+vvfat=${default_feature:-yes}
+qed=${default_feature:-yes}
+parallels=${default_feature:-yes}
+libxml2="$default_feature"
 debug_mutex="no"
 libpmem=""
 default_devices="yes"
@@ -1575,10 +1574,6 @@ for opt do
   ;;
   --enable-parallels) parallels="yes"
   ;;
-  --disable-sheepdog) sheepdog="no"
-  ;;
-  --enable-sheepdog) sheepdog="yes"
-  ;;
   --disable-vhost-user) vhost_user="no"
   ;;
   --enable-vhost-user) vhost_user="yes"
@@ -1945,7 +1940,6 @@ disabled with --disable-FEATURE, default is enabled if available:
   vvfat           vvfat image format support
   qed             qed image format support
   parallels       parallels image format support
-  sheepdog        sheepdog block driver support
   crypto-afalg    Linux AF_ALG crypto backend driver
   capstone        capstone disassembler support
   debug-mutex     mutex debugging support
@@ -7901,12 +7895,6 @@ if test "$qed" = "yes" ; then
 fi
 if test "$parallels" = "yes" ; then
   echo "CONFIG_PARALLELS=y" >> $config_host_mak
-fi
-if test "$sheepdog" = "yes" ; then
-  echo "CONFIG_SHEEPDOG=y" >> $config_host_mak
-fi
-if test "$pty_h" = "yes" ; then
-  echo "HAVE_PTY_H=y" >> $config_host_mak
 fi
 if test "$have_mlockall" = "yes" ; then
   echo "HAVE_MLOCKALL=y" >> $config_host_mak
