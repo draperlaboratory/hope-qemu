@@ -22,9 +22,10 @@
 #include "hw/s390x/s390_flic.h"
 #include "hw/s390x/adapter.h"
 #include "hw/s390x/css.h"
+#include "migration/qemu-file-types.h"
 #include "trace.h"
 
-#define FLIC_SAVE_INITIAL_SIZE getpagesize()
+#define FLIC_SAVE_INITIAL_SIZE qemu_real_host_page_size
 #define FLIC_FAILED (-1UL)
 #define FLIC_SAVEVM_VERSION 1
 
@@ -330,6 +331,10 @@ static int kvm_s390_add_adapter_routes(S390FLICState *fs,
     int ret, i;
     uint64_t ind_offset = routes->adapter.ind_offset;
 
+    if (!kvm_gsi_routing_enabled()) {
+        return -ENOSYS;
+    }
+
     for (i = 0; i < routes->num_routes; i++) {
         ret = kvm_irqchip_add_adapter_route(kvm_state, &routes->adapter);
         if (ret < 0) {
@@ -356,6 +361,10 @@ static void kvm_s390_release_adapter_routes(S390FLICState *fs,
                                             AdapterRoutes *routes)
 {
     int i;
+
+    if (!kvm_gsi_routing_enabled()) {
+        return;
+    }
 
     for (i = 0; i < routes->num_routes; i++) {
         if (routes->gsi[i] >= 0) {
@@ -588,12 +597,6 @@ static void kvm_s390_flic_realize(DeviceState *dev, Error **errp)
         goto fail;
     }
     flic_state->fd = -1;
-    if (!kvm_check_extension(kvm_state, KVM_CAP_DEVICE_CTRL)) {
-        error_setg_errno(&errp_local, errno, "KVM is missing capability"
-                         " KVM_CAP_DEVICE_CTRL");
-        trace_flic_no_device_api(errno);
-        goto fail;
-    }
 
     cd.type = KVM_DEV_TYPE_FLIC;
     ret = kvm_vm_ioctl(kvm_state, KVM_CREATE_DEVICE, &cd);

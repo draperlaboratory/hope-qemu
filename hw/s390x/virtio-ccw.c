@@ -12,11 +12,10 @@
 
 #include "qemu/osdep.h"
 #include "qapi/error.h"
-#include "hw/hw.h"
-#include "sysemu/sysemu.h"
 #include "sysemu/kvm.h"
 #include "net/net.h"
 #include "hw/virtio/virtio.h"
+#include "migration/qemu-file-types.h"
 #include "hw/virtio/virtio-net.h"
 #include "hw/sysbus.h"
 #include "qemu/bitops.h"
@@ -698,6 +697,7 @@ static void virtio_ccw_device_realize(VirtioCcwDevice *dev, Error **errp)
     CCWDeviceClass *ck = CCW_DEVICE_GET_CLASS(ccw_dev);
     SubchDev *sch;
     Error *err = NULL;
+    int i;
 
     sch = css_create_sch(ccw_dev->devno, errp);
     if (!sch) {
@@ -718,6 +718,9 @@ static void virtio_ccw_device_realize(VirtioCcwDevice *dev, Error **errp)
     ccw_dev->sch = sch;
     dev->indicators = NULL;
     dev->revision = -1;
+    for (i = 0; i < ADAPTER_ROUTES_MAX_GSI; i++) {
+        dev->routes.gsi[i] = -1;
+    }
     css_sch_build_virtual_schib(sch, 0, VIRTIO_CCW_CHPID_TYPE);
 
     trace_virtio_ccw_new_device(

@@ -17,6 +17,7 @@
 #include "virtio-9p.h"
 #include "fsdev/qemu-fsdev.h"
 #include "coth.h"
+#include "hw/qdev-properties.h"
 #include "hw/virtio/virtio-access.h"
 #include "qemu/iov.h"
 #include "qemu/module.h"
@@ -214,6 +215,7 @@ static void virtio_9p_device_unrealize(DeviceState *dev, Error **errp)
     V9fsVirtioState *v = VIRTIO_9P(dev);
     V9fsState *s = &v->state;
 
+    virtio_del_queue(vdev, 0);
     virtio_cleanup(vdev);
     v9fs_device_unrealize_common(s, errp);
 }

@@ -27,6 +27,7 @@
 #include "net/net.h"
 #include "clients.h"
 #include "hub.h"
+#include "hw/qdev-properties.h"
 #include "net/slirp.h"
 #include "net/eth.h"
 #include "util.h"
@@ -42,7 +43,6 @@
 #include "qemu/cutils.h"
 #include "qemu/config-file.h"
 #include "qemu/ctype.h"
-#include "hw/qdev.h"
 #include "qemu/iov.h"
 #include "qemu/main-loop.h"
 #include "qemu/option.h"
@@ -50,6 +50,8 @@
 #include "qapi/opts-visitor.h"
 #include "sysemu/sysemu.h"
 #include "sysemu/qtest.h"
+#include "sysemu/runstate.h"
+#include "sysemu/sysemu.h"
 #include "net/filter.h"
 #include "qapi/string-output-visitor.h"
 
@@ -1522,7 +1524,7 @@ static int net_param_nic(void *dummy, QemuOpts *opts, Error **errp)
     /* Create an ID if the user did not specify one */
     nd_id = g_strdup(qemu_opts_id(opts));
     if (!nd_id) {
-        nd_id = g_strdup_printf("__org.qemu.nic%i\n", idx);
+        nd_id = g_strdup_printf("__org.qemu.nic%i", idx);
         qemu_opts_set_id(opts, nd_id);
     }
 

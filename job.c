@@ -369,17 +369,17 @@ void job_unref(Job *job)
 
 void job_progress_update(Job *job, uint64_t done)
 {
-    job->progress_current += done;
+    progress_work_done(&job->progress, done);
 }
 
 void job_progress_set_remaining(Job *job, uint64_t remaining)
 {
-    job->progress_total = job->progress_current + remaining;
+    progress_set_remaining(&job->progress, remaining);
 }
 
 void job_progress_increase_remaining(Job *job, uint64_t delta)
 {
-    job->progress_total += delta;
+    progress_increase_remaining(&job->progress, delta);
 }
 
 void job_event_cancelled(Job *job)
@@ -521,16 +521,6 @@ void coroutine_fn job_sleep_ns(Job *job, int64_t ns)
     }
 
     job_pause_point(job);
-}
-
-void job_drain(Job *job)
-{
-    /* If job is !busy this kicks it into the next pause point. */
-    job_enter(job);
-
-    if (job->driver->drain) {
-        job->driver->drain(job);
-    }
 }
 
 /* Assumes the block_job_mutex is held */
@@ -991,7 +981,7 @@ int job_finish_sync(Job *job, void (*finish)(Job *, Error **errp), Error **errp)
     }
 
     AIO_WAIT_WHILE(job->aio_context,
-                   (job_drain(job), !job_is_completed(job)));
+                   (job_enter(job), !job_is_completed(job)));
 
     ret = (job_is_cancelled(job) && job->ret == 0) ? -ECANCELED : job->ret;
     job_unref(job);

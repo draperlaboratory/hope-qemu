@@ -19,13 +19,12 @@
 #include "net/eth.h"
 #include "chardev/char.h"
 #include "sysemu/block-backend.h"
-#include "sysemu/sysemu.h"
+#include "sysemu/runstate.h"
 #include "qemu/config-file.h"
 #include "qemu/option.h"
 #include "qemu/timer.h"
 #include "qemu/sockets.h"
 #include "monitor/monitor-internal.h"
-#include "monitor/qdev.h"
 #include "qapi/error.h"
 #include "qapi/clone-visitor.h"
 #include "qapi/opts-visitor.h"
@@ -35,7 +34,6 @@
 #include "qapi/qapi-commands-migration.h"
 #include "qapi/qapi-commands-misc.h"
 #include "qapi/qapi-commands-net.h"
-#include "qapi/qapi-commands-qdev.h"
 #include "qapi/qapi-commands-rocker.h"
 #include "qapi/qapi-commands-run-state.h"
 #include "qapi/qapi-commands-tpm.h"
@@ -221,23 +219,10 @@ static char *SocketAddress_to_str(SocketAddress *addr)
 void hmp_info_migrate(Monitor *mon, const QDict *qdict)
 {
     MigrationInfo *info;
-    MigrationCapabilityStatusList *caps, *cap;
 
     info = qmp_query_migrate(NULL);
-    caps = qmp_query_migrate_capabilities(NULL);
 
     migration_global_dump(mon);
-
-    /* do not display parameters during setup */
-    if (info->has_status && caps) {
-        monitor_printf(mon, "capabilities: ");
-        for (cap = caps; cap; cap = cap->next) {
-            monitor_printf(mon, "%s: %s ",
-                           MigrationCapability_str(cap->value->capability),
-                           cap->value->state ? "on" : "off");
-        }
-        monitor_printf(mon, "\n");
-    }
 
     if (info->has_status) {
         monitor_printf(mon, "Migration status: %s",
@@ -371,7 +356,6 @@ void hmp_info_migrate(Monitor *mon, const QDict *qdict)
         monitor_printf(mon, "]\n");
     }
     qapi_free_MigrationInfo(info);
-    qapi_free_MigrationCapabilityStatusList(caps);
 }
 
 void hmp_info_migrate_capabilities(Monitor *mon, const QDict *qdict)
@@ -746,10 +730,11 @@ static void hmp_info_vnc_servers(Monitor *mon, VncServerInfo2List *server)
 
 void hmp_info_vnc(Monitor *mon, const QDict *qdict)
 {
-    VncInfo2List *info2l;
+    VncInfo2List *info2l, *info2l_head;
     Error *err = NULL;
 
     info2l = qmp_query_vnc_servers(&err);
+    info2l_head = info2l;
     if (err) {
         hmp_handle_error(mon, &err);
         return;
@@ -778,7 +763,7 @@ void hmp_info_vnc(Monitor *mon, const QDict *qdict)
         info2l = info2l->next;
     }
 
-    qapi_free_VncInfo2List(info2l);
+    qapi_free_VncInfo2List(info2l_head);
 
 }
 #endif
@@ -2180,23 +2165,6 @@ void hmp_migrate(Monitor *mon, const QDict *qdict)
                                           status);
         timer_mod(status->timer, qemu_clock_get_ms(QEMU_CLOCK_REALTIME));
     }
-}
-
-void hmp_device_add(Monitor *mon, const QDict *qdict)
-{
-    Error *err = NULL;
-
-    qmp_device_add((QDict *)qdict, NULL, &err);
-    hmp_handle_error(mon, &err);
-}
-
-void hmp_device_del(Monitor *mon, const QDict *qdict)
-{
-    const char *id = qdict_get_str(qdict, "id");
-    Error *err = NULL;
-
-    qmp_device_del(id, &err);
-    hmp_handle_error(mon, &err);
 }
 
 void hmp_netdev_add(Monitor *mon, const QDict *qdict)

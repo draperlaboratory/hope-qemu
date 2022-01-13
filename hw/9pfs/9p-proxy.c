@@ -1139,10 +1139,10 @@ static int proxy_parse_opts(QemuOpts *opts, FsDriverEntry *fs, Error **errp)
     }
     if (socket) {
         fs->path = g_strdup(socket);
-        fs->export_flags = V9FS_PROXY_SOCK_NAME;
+        fs->export_flags |= V9FS_PROXY_SOCK_NAME;
     } else {
         fs->path = g_strdup(sock_fd);
-        fs->export_flags = V9FS_PROXY_SOCK_FD;
+        fs->export_flags |= V9FS_PROXY_SOCK_FD;
     }
     return 0;
 }
@@ -1184,6 +1184,10 @@ static int proxy_init(FsContext *ctx, Error **errp)
 static void proxy_cleanup(FsContext *ctx)
 {
     V9fsProxy *proxy = ctx->private;
+
+    if (!proxy) {
+        return;
+    }
 
     g_free(proxy->out_iovec.iov_base);
     g_free(proxy->in_iovec.iov_base);

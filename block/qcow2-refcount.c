@@ -889,6 +889,7 @@ static int QEMU_WARN_UNUSED_RESULT update_refcount(BlockDriverState *bs,
                                                 offset);
             if (table != NULL) {
                 qcow2_cache_put(s->refcount_block_cache, &refcount_block);
+                old_table_index = -1;
                 qcow2_cache_discard(s->refcount_block_cache, table);
             }
 
@@ -2016,7 +2017,7 @@ static int check_refblocks(BlockDriverState *bs, BdrvCheckResult *res,
                     goto resize_fail;
                 }
 
-                ret = bdrv_truncate(bs->file, offset + s->cluster_size,
+                ret = bdrv_truncate(bs->file, offset + s->cluster_size, false,
                                     PREALLOC_MODE_OFF, &local_err);
                 if (ret < 0) {
                     error_report_err(local_err);
@@ -3454,6 +3455,8 @@ int qcow2_detect_metadata_preallocation(BlockDriverState *bs)
     BDRVQcow2State *s = bs->opaque;
     int64_t i, end_cluster, cluster_count = 0, threshold;
     int64_t file_length, real_allocation, real_clusters;
+
+    qemu_co_mutex_assert_locked(&s->lock);
 
     file_length = bdrv_getlength(bs->file->bs);
     if (file_length < 0) {

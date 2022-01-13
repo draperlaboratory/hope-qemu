@@ -40,6 +40,7 @@
 #include "qemu/module.h"
 #include "qemu/option.h"
 #include "qemu/uuid.h"
+#include "sysemu/replay.h"
 #include "qapi/error.h"
 #include "qapi/qapi-commands-misc.h"
 #include "qapi/qmp/qdict.h"
@@ -280,8 +281,8 @@ iscsi_co_generic_cb(struct iscsi_context *iscsi, int status,
     }
 
     if (iTask->co) {
-        aio_bh_schedule_oneshot(iTask->iscsilun->aio_context,
-                                 iscsi_co_generic_bh_cb, iTask);
+        replay_bh_schedule_oneshot_event(iTask->iscsilun->aio_context,
+                                         iscsi_co_generic_bh_cb, iTask);
     } else {
         iTask->complete = 1;
     }
@@ -700,7 +701,7 @@ static int coroutine_fn iscsi_co_block_status(BlockDriverState *bs,
     struct scsi_get_lba_status *lbas = NULL;
     struct scsi_lba_status_descriptor *lbasd = NULL;
     struct IscsiTask iTask;
-    uint64_t lba;
+    uint64_t lba, max_bytes;
     int ret;
 
     iscsi_co_init_iscsitask(iscsilun, &iTask);
@@ -720,6 +721,7 @@ static int coroutine_fn iscsi_co_block_status(BlockDriverState *bs,
     }
 
     lba = offset / iscsilun->block_size;
+    max_bytes = (iscsilun->num_blocks - lba) * iscsilun->block_size;
 
     qemu_mutex_lock(&iscsilun->mutex);
 retry:
@@ -763,7 +765,7 @@ retry:
         goto out_unlock;
     }
 
-    *pnum = (int64_t) lbasd->num_blocks * iscsilun->block_size;
+    *pnum = MIN((int64_t) lbasd->num_blocks * iscsilun->block_size, max_bytes);
 
     if (lbasd->provisioning == SCSI_PROVISIONING_TYPE_DEALLOCATED ||
         lbasd->provisioning == SCSI_PROVISIONING_TYPE_ANCHORED) {
@@ -2122,9 +2124,11 @@ static void iscsi_reopen_commit(BDRVReopenState *reopen_state)
 }
 
 static int coroutine_fn iscsi_co_truncate(BlockDriverState *bs, int64_t offset,
-                                          PreallocMode prealloc, Error **errp)
+                                          bool exact, PreallocMode prealloc,
+                                          Error **errp)
 {
     IscsiLun *iscsilun = bs->opaque;
+    int64_t cur_length;
     Error *local_err = NULL;
 
     if (prealloc != PREALLOC_MODE_OFF) {
@@ -2144,7 +2148,11 @@ static int coroutine_fn iscsi_co_truncate(BlockDriverState *bs, int64_t offset,
         return -EIO;
     }
 
-    if (offset > iscsi_getlength(bs)) {
+    cur_length = iscsi_getlength(bs);
+    if (offset != cur_length && exact) {
+        error_setg(errp, "Cannot resize iSCSI devices");
+        return -ENOTSUP;
+    } else if (offset > cur_length) {
         error_setg(errp, "Cannot grow iSCSI devices");
         return -EINVAL;
     }

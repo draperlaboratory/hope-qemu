@@ -22,11 +22,14 @@
 #include "qemu/cutils.h"
 #include "qom/object.h"
 #include "hw/qdev-core.h"
+#include "hw/qdev-properties.h"
 #include "hw/virtio/vhost.h"
 #include "hw/virtio/vhost-user-blk.h"
 #include "hw/virtio/virtio.h"
 #include "hw/virtio/virtio-bus.h"
 #include "hw/virtio/virtio-access.h"
+#include "sysemu/sysemu.h"
+#include "sysemu/runstate.h"
 
 static const int user_feature_bits[] = {
     VIRTIO_BLK_F_SIZE_MAX,
@@ -418,7 +421,7 @@ static void vhost_user_blk_device_realize(DeviceState *dev, Error **errp)
     }
 
     s->inflight = g_new0(struct vhost_inflight, 1);
-    s->vqs = g_new(struct vhost_virtqueue, s->num_queues);
+    s->vqs = g_new0(struct vhost_virtqueue, s->num_queues);
     s->watch = 0;
     s->connected = false;
 
@@ -452,6 +455,9 @@ reconnect:
 virtio_err:
     g_free(s->vqs);
     g_free(s->inflight);
+    for (i = 0; i < s->num_queues; i++) {
+        virtio_del_queue(vdev, i);
+    }
     virtio_cleanup(vdev);
     vhost_user_cleanup(&s->vhost_user);
 }
@@ -460,6 +466,7 @@ static void vhost_user_blk_device_unrealize(DeviceState *dev, Error **errp)
 {
     VirtIODevice *vdev = VIRTIO_DEVICE(dev);
     VHostUserBlk *s = VHOST_USER_BLK(dev);
+    int i;
 
     virtio_set_status(vdev, 0);
     qemu_chr_fe_set_handlers(&s->chardev,  NULL, NULL, NULL,
@@ -468,6 +475,10 @@ static void vhost_user_blk_device_unrealize(DeviceState *dev, Error **errp)
     vhost_dev_free_inflight(s->inflight);
     g_free(s->vqs);
     g_free(s->inflight);
+
+    for (i = 0; i < s->num_queues; i++) {
+        virtio_del_queue(vdev, i);
+    }
     virtio_cleanup(vdev);
     vhost_user_cleanup(&s->vhost_user);
 }
