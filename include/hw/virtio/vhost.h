@@ -1,7 +1,6 @@
 #ifndef VHOST_H
 #define VHOST_H
 
-#include "hw/hw.h"
 #include "hw/virtio/vhost-backend.h"
 #include "hw/virtio/virtio.h"
 #include "exec/memory.h"
@@ -91,6 +90,13 @@ struct vhost_dev {
     QLIST_HEAD(, vhost_iommu) iommu_list;
     IOMMUNotifier n;
     const VhostDevConfigOps *config_ops;
+};
+
+struct vhost_net {
+    struct vhost_dev dev;
+    struct vhost_virtqueue vqs[2];
+    int backend;
+    NetClientState *nc;
 };
 
 int vhost_dev_init(struct vhost_dev *hdev, void *opaque,

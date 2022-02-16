@@ -20,8 +20,9 @@
 #include "qemu/osdep.h"
 #include "qemu/main-loop.h"
 #include "exec/cpu-common.h"
-#include "qom/cpu.h"
+#include "hw/core/cpu.h"
 #include "sysemu/cpus.h"
+#include "qemu/lockable.h"
 
 static QemuMutex qemu_cpu_list_lock;
 static QemuCond exclusive_cond;
@@ -60,24 +61,22 @@ static bool cpu_index_auto_assigned;
 static int cpu_get_free_index(void)
 {
     CPUState *some_cpu;
-    int cpu_index = 0;
+    int max_cpu_index = 0;
 
     cpu_index_auto_assigned = true;
     CPU_FOREACH(some_cpu) {
-        cpu_index++;
+        if (some_cpu->cpu_index >= max_cpu_index) {
+            max_cpu_index = some_cpu->cpu_index + 1;
+        }
     }
-    return cpu_index;
+    return max_cpu_index;
 }
 
-static void finish_safe_work(CPUState *cpu)
-{
-    cpu_exec_start(cpu);
-    cpu_exec_end(cpu);
-}
+CPUTailQ cpus = QTAILQ_HEAD_INITIALIZER(cpus);
 
 void cpu_list_add(CPUState *cpu)
 {
-    qemu_mutex_lock(&qemu_cpu_list_lock);
+    QEMU_LOCK_GUARD(&qemu_cpu_list_lock);
     if (cpu->cpu_index == UNASSIGNED_CPU_INDEX) {
         cpu->cpu_index = cpu_get_free_index();
         assert(cpu->cpu_index != UNASSIGNED_CPU_INDEX);
@@ -85,29 +84,38 @@ void cpu_list_add(CPUState *cpu)
         assert(!cpu_index_auto_assigned);
     }
     QTAILQ_INSERT_TAIL_RCU(&cpus, cpu, node);
-    qemu_mutex_unlock(&qemu_cpu_list_lock);
-
-    finish_safe_work(cpu);
 }
 
 void cpu_list_remove(CPUState *cpu)
 {
-    qemu_mutex_lock(&qemu_cpu_list_lock);
+    QEMU_LOCK_GUARD(&qemu_cpu_list_lock);
     if (!QTAILQ_IN_USE(cpu, node)) {
         /* there is nothing to undo since cpu_exec_init() hasn't been called */
-        qemu_mutex_unlock(&qemu_cpu_list_lock);
         return;
     }
 
-    assert(!(cpu_index_auto_assigned && cpu != QTAILQ_LAST(&cpus)));
-
     QTAILQ_REMOVE_RCU(&cpus, cpu, node);
     cpu->cpu_index = UNASSIGNED_CPU_INDEX;
-    qemu_mutex_unlock(&qemu_cpu_list_lock);
 }
 
+CPUState *qemu_get_cpu(int index)
+{
+    CPUState *cpu;
+
+    CPU_FOREACH(cpu) {
+        if (cpu->cpu_index == index) {
+            return cpu;
+        }
+    }
+
+    return NULL;
+}
+
+/* current CPU in the current thread. It is only valid inside cpu_exec() */
+__thread CPUState *current_cpu;
+
 struct qemu_work_item {
-    struct qemu_work_item *next;
+    QSIMPLEQ_ENTRY(qemu_work_item) node;
     run_on_cpu_func func;
     run_on_cpu_data data;
     bool free, exclusive, done;
@@ -116,13 +124,7 @@ struct qemu_work_item {
 static void queue_work_on_cpu(CPUState *cpu, struct qemu_work_item *wi)
 {
     qemu_mutex_lock(&cpu->work_mutex);
-    if (cpu->queued_work_first == NULL) {
-        cpu->queued_work_first = wi;
-    } else {
-        cpu->queued_work_last->next = wi;
-    }
-    cpu->queued_work_last = wi;
-    wi->next = NULL;
+    QSIMPLEQ_INSERT_TAIL(&cpu->work_list, wi, node);
     wi->done = false;
     qemu_mutex_unlock(&cpu->work_mutex);
 
@@ -208,11 +210,15 @@ void start_exclusive(void)
      * section until end_exclusive resets pending_cpus to 0.
      */
     qemu_mutex_unlock(&qemu_cpu_list_lock);
+
+    current_cpu->in_exclusive_context = true;
 }
 
 /* Finish an exclusive operation.  */
 void end_exclusive(void)
 {
+    current_cpu->in_exclusive_context = false;
+
     qemu_mutex_lock(&qemu_cpu_list_lock);
     atomic_set(&pending_cpus, 0);
     qemu_cond_broadcast(&exclusive_resume);
@@ -241,7 +247,7 @@ void cpu_exec_start(CPUState *cpu)
      * see cpu->running == true, and it will kick the CPU.
      */
     if (unlikely(atomic_read(&pending_cpus))) {
-        qemu_mutex_lock(&qemu_cpu_list_lock);
+        QEMU_LOCK_GUARD(&qemu_cpu_list_lock);
         if (!cpu->has_waiter) {
             /* Not counted in pending_cpus, let the exclusive item
              * run.  Since we have the lock, just set cpu->running to true
@@ -256,7 +262,6 @@ void cpu_exec_start(CPUState *cpu)
              * waiter at cpu_exec_end.
              */
         }
-        qemu_mutex_unlock(&qemu_cpu_list_lock);
     }
 }
 
@@ -284,7 +289,7 @@ void cpu_exec_end(CPUState *cpu)
      * next cpu_exec_start.
      */
     if (unlikely(atomic_read(&pending_cpus))) {
-        qemu_mutex_lock(&qemu_cpu_list_lock);
+        QEMU_LOCK_GUARD(&qemu_cpu_list_lock);
         if (cpu->has_waiter) {
             cpu->has_waiter = false;
             atomic_set(&pending_cpus, pending_cpus - 1);
@@ -292,7 +297,6 @@ void cpu_exec_end(CPUState *cpu)
                 qemu_cond_signal(&exclusive_cond);
             }
         }
-        qemu_mutex_unlock(&qemu_cpu_list_lock);
     }
 }
 
@@ -314,17 +318,14 @@ void process_queued_cpu_work(CPUState *cpu)
 {
     struct qemu_work_item *wi;
 
-    if (cpu->queued_work_first == NULL) {
+    qemu_mutex_lock(&cpu->work_mutex);
+    if (QSIMPLEQ_EMPTY(&cpu->work_list)) {
+        qemu_mutex_unlock(&cpu->work_mutex);
         return;
     }
-
-    qemu_mutex_lock(&cpu->work_mutex);
-    while (cpu->queued_work_first != NULL) {
-        wi = cpu->queued_work_first;
-        cpu->queued_work_first = wi->next;
-        if (!cpu->queued_work_first) {
-            cpu->queued_work_last = NULL;
-        }
+    while (!QSIMPLEQ_EMPTY(&cpu->work_list)) {
+        wi = QSIMPLEQ_FIRST(&cpu->work_list);
+        QSIMPLEQ_REMOVE_HEAD(&cpu->work_list, node);
         qemu_mutex_unlock(&cpu->work_mutex);
         if (wi->exclusive) {
             /* Running work items outside the BQL avoids the following deadlock:

@@ -1308,7 +1308,7 @@ static void gen_##name(DisasContext *ctx)                                     \
     }                                                                         \
     xt = gen_vsr_ptr(xT(ctx->opcode));                                        \
     xa = gen_vsr_ptr(xA(ctx->opcode));                                        \
-    if (ctx->opcode & PPC_BIT(25)) {                                          \
+    if (ctx->opcode & PPC_BIT32(25)) {                                        \
         /*                                                                    \
          * AxT + B                                                            \
          */                                                                   \
@@ -1579,7 +1579,7 @@ static void gen_xxspltib(DisasContext *ctx)
             return;
         }
     }
-    tcg_gen_gvec_dup8i(vsr_full_offset(rt), 16, 16, uim8);
+    tcg_gen_gvec_dup_imm(MO_8, vsr_full_offset(rt), 16, 16, uim8);
 }
 
 static void gen_xxsldwi(DisasContext *ctx)

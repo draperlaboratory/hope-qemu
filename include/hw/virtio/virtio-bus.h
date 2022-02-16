@@ -25,8 +25,7 @@
 #ifndef VIRTIO_BUS_H
 #define VIRTIO_BUS_H
 
-#include "hw/qdev.h"
-#include "sysemu/sysemu.h"
+#include "hw/qdev-core.h"
 #include "hw/virtio/virtio.h"
 
 #define TYPE_VIRTIO_BUS "virtio-bus"
@@ -84,6 +83,10 @@ typedef struct VirtioBusClass {
      */
     int (*ioeventfd_assign)(DeviceState *d, EventNotifier *notifier,
                             int n, bool assign);
+    /*
+     * Whether queue number n is enabled.
+     */
+    bool (*queue_enabled)(DeviceState *d, int n);
     /*
      * Does the transport have variable vring alignment?
      * (ie can it ever call virtio_queue_set_align()?)

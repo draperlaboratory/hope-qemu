@@ -20,6 +20,8 @@
 #include "qemu/osdep.h"
 #include "qemu/units.h"
 #include "hw/isa/isa.h"
+#include "hw/qdev-properties.h"
+#include "migration/vmstate.h"
 #include "exec/address-spaces.h"
 #include "hw/boards.h"
 #include "qapi/error.h"
@@ -142,6 +144,7 @@ static void rs6000mc_realize(DeviceState *dev, Error **errp)
     RS6000MCState *s = RS6000MC_DEVICE(dev);
     int socket = 0;
     unsigned int ram_size = s->ram_size / MiB;
+    Error *local_err = NULL;
 
     while (socket < 6) {
         if (ram_size >= 64) {
@@ -163,9 +166,12 @@ static void rs6000mc_realize(DeviceState *dev, Error **errp)
         if (s->simm_size[socket]) {
             char name[] = "simm.?";
             name[5] = socket + '0';
-            memory_region_allocate_system_memory(&s->simm[socket], OBJECT(dev),
-                                                 name,
-                                                 s->simm_size[socket] * MiB);
+            memory_region_init_ram(&s->simm[socket], OBJECT(dev), name,
+                                   s->simm_size[socket] * MiB, &local_err);
+            if (local_err) {
+                error_propagate(errp, local_err);
+                return;
+            }
             memory_region_add_subregion_overlap(get_system_memory(), 0,
                                                 &s->simm[socket], socket);
         }
@@ -215,7 +221,7 @@ static void rs6000mc_class_initfn(ObjectClass *klass, void *data)
 
     dc->realize = rs6000mc_realize;
     dc->vmsd = &vmstate_rs6000mc;
-    dc->props = rs6000mc_properties;
+    device_class_set_props(dc, rs6000mc_properties);
 }
 
 static const TypeInfo rs6000mc_info = {

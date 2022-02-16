@@ -23,7 +23,9 @@
 #include "qemu/module.h"
 #include "qemu/timer.h"
 #include "hw/usb.h"
+#include "hw/usb/hcd-musb.h"
 #include "hw/arm/omap.h"
+#include "hw/hw.h"
 #include "hw/irq.h"
 #include "hw/sysbus.h"
 

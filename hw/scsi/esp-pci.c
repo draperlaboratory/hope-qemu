@@ -25,8 +25,10 @@
 
 #include "qemu/osdep.h"
 #include "hw/pci/pci.h"
+#include "hw/irq.h"
 #include "hw/nvram/eeprom93xx.h"
 #include "hw/scsi/esp.h"
+#include "migration/vmstate.h"
 #include "trace.h"
 #include "qapi/error.h"
 #include "qemu/log.h"
@@ -195,6 +197,7 @@ static void esp_pci_io_write(void *opaque, hwaddr addr,
         addr &= ~3;
         size = 4;
     }
+    g_assert(size >= 4);
 
     if (addr < 0x40) {
         /* SCSI core reg */

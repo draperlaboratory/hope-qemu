@@ -38,7 +38,7 @@ void helper_validator_validate(CPURISCVState *env, target_ulong pc, uint32_t opc
       g_free(msg);
 
       if (policy_validator_exc()) {
-         riscv_raise_exception(env, RISCV_POLICY_VIOLATION_FAULT, GETPC());
+         riscv_raise_exception(env, RISCV_EXCP_POLICY_VIOLATION_FAULT, GETPC());
       } else {
          qemu_log("MSG: End test.\n");
          exit(1);

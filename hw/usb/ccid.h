@@ -10,7 +10,7 @@
 #ifndef CCID_H
 #define CCID_H
 
-#include "hw/qdev.h"
+#include "hw/qdev-core.h"
 
 typedef struct CCIDCardState CCIDCardState;
 typedef struct CCIDCardInfo CCIDCardInfo;
@@ -36,7 +36,7 @@ typedef struct CCIDCardClass {
                             const uint8_t *apdu,
                             uint32_t len);
     void (*realize)(CCIDCardState *card, Error **errp);
-    void (*unrealize)(CCIDCardState *card, Error **errp);
+    void (*unrealize)(CCIDCardState *card);
 } CCIDCardClass;
 
 /*

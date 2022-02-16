@@ -12,11 +12,15 @@
 
 #include "qemu/osdep.h"
 #include "hw/sysbus.h"
+#include "migration/vmstate.h"
 #include "net/net.h"
 #include "net/eth.h"
+#include "hw/hw.h"
+#include "hw/irq.h"
 #include "hw/net/lan9118.h"
-#include "sysemu/sysemu.h"
 #include "hw/ptimer.h"
+#include "hw/qdev-properties.h"
+#include "qapi/error.h"
 #include "qemu/log.h"
 #include "qemu/module.h"
 /* For crc32 */
@@ -446,8 +450,10 @@ static void lan9118_reset(DeviceState *d)
     s->e2p_data = 0;
     s->free_timer_start = qemu_clock_get_ns(QEMU_CLOCK_VIRTUAL) / 40;
 
+    ptimer_transaction_begin(s->timer);
     ptimer_stop(s->timer);
     ptimer_set_count(s->timer, 0xffff);
+    ptimer_transaction_commit(s->timer);
     s->gpt_cfg = 0xffff;
 
     s->mac_cr = MAC_CR_PRMS;
@@ -1096,6 +1102,7 @@ static void lan9118_writel(void *opaque, hwaddr offset,
         break;
     case CSR_GPT_CFG:
         if ((s->gpt_cfg ^ val) & GPT_TIMER_EN) {
+            ptimer_transaction_begin(s->timer);
             if (val & GPT_TIMER_EN) {
                 ptimer_set_count(s->timer, val & 0xffff);
                 ptimer_run(s->timer, 0);
@@ -1103,6 +1110,7 @@ static void lan9118_writel(void *opaque, hwaddr offset,
                 ptimer_stop(s->timer);
                 ptimer_set_count(s->timer, 0xffff);
             }
+            ptimer_transaction_commit(s->timer);
         }
         s->gpt_cfg = val & (GPT_TIMER_EN | 0xffff);
         break;
@@ -1324,7 +1332,6 @@ static void lan9118_realize(DeviceState *dev, Error **errp)
 {
     SysBusDevice *sbd = SYS_BUS_DEVICE(dev);
     lan9118_state *s = LAN9118(dev);
-    QEMUBH *bh;
     int i;
     const MemoryRegionOps *mem_ops =
             s->mode_16bit ? &lan9118_16bit_mem_ops : &lan9118_mem_ops;
@@ -1345,10 +1352,11 @@ static void lan9118_realize(DeviceState *dev, Error **errp)
     s->pmt_ctrl = 1;
     s->txp = &s->tx_packet;
 
-    bh = qemu_bh_new(lan9118_tick, s);
-    s->timer = ptimer_init(bh, PTIMER_POLICY_DEFAULT);
+    s->timer = ptimer_init(lan9118_tick, s, PTIMER_POLICY_DEFAULT);
+    ptimer_transaction_begin(s->timer);
     ptimer_set_freq(s->timer, 10000);
     ptimer_set_limit(s->timer, 0xffff, 1);
+    ptimer_transaction_commit(s->timer);
 }
 
 static Property lan9118_properties[] = {
@@ -1362,7 +1370,7 @@ static void lan9118_class_init(ObjectClass *klass, void *data)
     DeviceClass *dc = DEVICE_CLASS(klass);
 
     dc->reset = lan9118_reset;
-    dc->props = lan9118_properties;
+    device_class_set_props(dc, lan9118_properties);
     dc->vmsd = &vmstate_lan9118;
     dc->realize = lan9118_realize;
 }
@@ -1387,10 +1395,10 @@ void lan9118_init(NICInfo *nd, uint32_t base, qemu_irq irq)
     SysBusDevice *s;
 
     qemu_check_nic_model(nd, "lan9118");
-    dev = qdev_create(NULL, TYPE_LAN9118);
+    dev = qdev_new(TYPE_LAN9118);
     qdev_set_nic_properties(dev, nd);
-    qdev_init_nofail(dev);
     s = SYS_BUS_DEVICE(dev);
+    sysbus_realize_and_unref(s, &error_fatal);
     sysbus_mmio_map(s, 0, base);
     sysbus_connect_irq(s, 0, irq);
 }

@@ -2,13 +2,14 @@ FROM centos:7
 RUN yum install -y epel-release centos-release-xen-48
 
 RUN yum -y update
+
+# Please keep this list sorted alphabetically
 ENV PACKAGES \
-    bison \
     bzip2 \
     bzip2-devel \
     ccache \
     csnappy-devel \
-    flex \
+    dbus-daemon \
     gcc-c++ \
     gcc \
     gettext \
@@ -18,6 +19,7 @@ ENV PACKAGES \
     libepoxy-devel \
     libfdt-devel \
     librdmacm-devel \
+    libzstd-devel \
     lzo-devel \
     make \
     mesa-libEGL-devel \
@@ -25,6 +27,7 @@ ENV PACKAGES \
     nettle-devel \
     perl-Test-Harness \
     pixman-devel \
+    python3 \
     SDL-devel \
     spice-glib-devel \
     spice-server-devel \
@@ -34,4 +37,3 @@ ENV PACKAGES \
     zlib-devel
 RUN yum install -y $PACKAGES
 RUN rpm -q $PACKAGES | sort > /packages.txt
-

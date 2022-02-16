@@ -15,8 +15,10 @@
 #ifndef HW_PL011_H
 #define HW_PL011_H
 
+#include "hw/qdev-properties.h"
 #include "hw/sysbus.h"
 #include "chardev/char-fe.h"
+#include "qapi/error.h"
 
 #define TYPE_PL011 "pl011"
 #define PL011(obj) OBJECT_CHECK(PL011State, (obj), TYPE_PL011)
@@ -56,10 +58,10 @@ static inline DeviceState *pl011_create(hwaddr addr,
     DeviceState *dev;
     SysBusDevice *s;
 
-    dev = qdev_create(NULL, "pl011");
+    dev = qdev_new("pl011");
     s = SYS_BUS_DEVICE(dev);
     qdev_prop_set_chr(dev, "chardev", chr);
-    qdev_init_nofail(dev);
+    sysbus_realize_and_unref(s, &error_fatal);
     sysbus_mmio_map(s, 0, addr);
     sysbus_connect_irq(s, 0, irq);
 
@@ -73,10 +75,10 @@ static inline DeviceState *pl011_luminary_create(hwaddr addr,
     DeviceState *dev;
     SysBusDevice *s;
 
-    dev = qdev_create(NULL, "pl011_luminary");
+    dev = qdev_new("pl011_luminary");
     s = SYS_BUS_DEVICE(dev);
     qdev_prop_set_chr(dev, "chardev", chr);
-    qdev_init_nofail(dev);
+    sysbus_realize_and_unref(s, &error_fatal);
     sysbus_mmio_map(s, 0, addr);
     sysbus_connect_irq(s, 0, irq);
 

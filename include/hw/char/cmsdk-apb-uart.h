@@ -12,6 +12,7 @@
 #ifndef CMSDK_APB_UART_H
 #define CMSDK_APB_UART_H
 
+#include "hw/qdev-properties.h"
 #include "hw/sysbus.h"
 #include "chardev/char-fe.h"
 
@@ -61,11 +62,11 @@ static inline DeviceState *cmsdk_apb_uart_create(hwaddr addr,
     DeviceState *dev;
     SysBusDevice *s;
 
-    dev = qdev_create(NULL, TYPE_CMSDK_APB_UART);
+    dev = qdev_new(TYPE_CMSDK_APB_UART);
     s = SYS_BUS_DEVICE(dev);
     qdev_prop_set_chr(dev, "chardev", chr);
     qdev_prop_set_uint32(dev, "pclk-frq", pclk_frq);
-    qdev_init_nofail(dev);
+    sysbus_realize_and_unref(s, &error_fatal);
     sysbus_mmio_map(s, 0, addr);
     sysbus_connect_irq(s, 0, txint);
     sysbus_connect_irq(s, 1, rxint);

@@ -22,7 +22,7 @@
 #include "cpu.h"
 #include "disas/disas.h"
 #include "exec/exec-all.h"
-#include "tcg-op.h"
+#include "tcg/tcg-op.h"
 #include "exec/helper-proto.h"
 #include "microblaze-decode.h"
 #include "exec/cpu_ldst.h"
@@ -185,7 +185,7 @@ static void write_carryi(DisasContext *dc, bool carry)
 static bool trap_illegal(DisasContext *dc, bool cond)
 {
     if (cond && (dc->tb_flags & MSR_EE_FLAG)
-        && (dc->cpu->env.pvr.regs[2] & PVR2_ILL_OPCODE_EXC_MASK)) {
+        && dc->cpu->cfg.illegal_opcode_exception) {
         tcg_gen_movi_i64(cpu_SR[SR_ESR], ESR_EC_ILLEGAL_OP);
         t_gen_raise_exception(dc, EXCP_HW_EXCP);
     }
@@ -581,6 +581,7 @@ static void dec_msr(DisasContext *dc)
             case SR_ESR:
             case SR_FSR:
             case SR_BTR:
+            case SR_EDR:
                 tcg_gen_extrl_i64_i32(cpu_R[dc->rd], cpu_SR[sr]);
                 break;
             case 0x800:
@@ -919,7 +920,7 @@ static void dec_load(DisasContext *dc)
     unsigned int size;
     bool rev = false, ex = false, ea = false;
     int mem_index = cpu_mmu_index(&dc->cpu->env, false);
-    TCGMemOp mop;
+    MemOp mop;
 
     mop = dc->opcode & 3;
     size = 1 << mop;
@@ -962,17 +963,7 @@ static void dec_load(DisasContext *dc)
         switch (size) {
             case 1:
             {
-                /* 00 -> 11
-                   01 -> 10
-                   10 -> 10
-                   11 -> 00 */
-                TCGv low = tcg_temp_new();
-
-                tcg_gen_andi_tl(low, addr, 3);
-                tcg_gen_sub_tl(low, tcg_const_tl(3), low);
-                tcg_gen_andi_tl(addr, addr, ~3);
-                tcg_gen_or_tl(addr, addr, low);
-                tcg_temp_free(low);
+                tcg_gen_xori_tl(addr, addr, 3);
                 break;
             }
 
@@ -1005,10 +996,17 @@ static void dec_load(DisasContext *dc)
     v = tcg_temp_new_i32();
     tcg_gen_qemu_ld_i32(v, addr, mem_index, mop);
 
-    if ((dc->cpu->env.pvr.regs[2] & PVR2_UNALIGNED_EXC_MASK) && size > 1) {
+    if (dc->cpu->cfg.unaligned_exceptions && size > 1) {
+        TCGv_i32 t0 = tcg_const_i32(0);
+        TCGv_i32 treg = tcg_const_i32(dc->rd);
+        TCGv_i32 tsize = tcg_const_i32(size - 1);
+
         tcg_gen_movi_i64(cpu_SR[SR_PC], dc->pc);
-        gen_helper_memalign(cpu_env, addr, tcg_const_i32(dc->rd),
-                            tcg_const_i32(0), tcg_const_i32(size - 1));
+        gen_helper_memalign(cpu_env, addr, treg, t0, tsize);
+
+        tcg_temp_free_i32(t0);
+        tcg_temp_free_i32(treg);
+        tcg_temp_free_i32(tsize);
     }
 
     if (ex) {
@@ -1035,7 +1033,7 @@ static void dec_store(DisasContext *dc)
     unsigned int size;
     bool rev = false, ex = false, ea = false;
     int mem_index = cpu_mmu_index(&dc->cpu->env, false);
-    TCGMemOp mop;
+    MemOp mop;
 
     mop = dc->opcode & 3;
     size = 1 << mop;
@@ -1095,17 +1093,7 @@ static void dec_store(DisasContext *dc)
         switch (size) {
             case 1:
             {
-                /* 00 -> 11
-                   01 -> 10
-                   10 -> 10
-                   11 -> 00 */
-                TCGv low = tcg_temp_new();
-
-                tcg_gen_andi_tl(low, addr, 3);
-                tcg_gen_sub_tl(low, tcg_const_tl(3), low);
-                tcg_gen_andi_tl(addr, addr, ~3);
-                tcg_gen_or_tl(addr, addr, low);
-                tcg_temp_free(low);
+                tcg_gen_xori_tl(addr, addr, 3);
                 break;
             }
 
@@ -1123,7 +1111,11 @@ static void dec_store(DisasContext *dc)
     tcg_gen_qemu_st_i32(cpu_R[dc->rd], addr, mem_index, mop);
 
     /* Verify alignment if needed.  */
-    if ((dc->cpu->env.pvr.regs[2] & PVR2_UNALIGNED_EXC_MASK) && size > 1) {
+    if (dc->cpu->cfg.unaligned_exceptions && size > 1) {
+        TCGv_i32 t1 = tcg_const_i32(1);
+        TCGv_i32 treg = tcg_const_i32(dc->rd);
+        TCGv_i32 tsize = tcg_const_i32(size - 1);
+
         tcg_gen_movi_i64(cpu_SR[SR_PC], dc->pc);
         /* FIXME: if the alignment is wrong, we should restore the value
          *        in memory. One possible way to achieve this is to probe
@@ -1131,8 +1123,11 @@ static void dec_store(DisasContext *dc)
          *        the alignment checks in between the probe and the mem
          *        access.
          */
-        gen_helper_memalign(cpu_env, addr, tcg_const_i32(dc->rd),
-                            tcg_const_i32(1), tcg_const_i32(size - 1));
+        gen_helper_memalign(cpu_env, addr, treg, t1, tsize);
+
+        tcg_temp_free_i32(t1);
+        tcg_temp_free_i32(treg);
+        tcg_temp_free_i32(tsize);
     }
 
     if (ex) {
@@ -1183,6 +1178,17 @@ static void eval_cond_jmp(DisasContext *dc, TCGv_i64 pc_true, TCGv_i64 pc_false)
     tcg_temp_free_i64(tmp_zero);
 }
 
+static void dec_setup_dslot(DisasContext *dc)
+{
+        TCGv_i32 tmp = tcg_const_i32(dc->type_b && (dc->tb_flags & IMM_FLAG));
+
+        dc->delayed_branch = 2;
+        dc->tb_flags |= D_FLAG;
+
+        tcg_gen_st_i32(tmp, cpu_env, offsetof(CPUMBState, bimm));
+        tcg_temp_free_i32(tmp);
+}
+
 static void dec_bcc(DisasContext *dc)
 {
     unsigned int cc;
@@ -1194,10 +1200,7 @@ static void dec_bcc(DisasContext *dc)
 
     dc->delayed_branch = 1;
     if (dslot) {
-        dc->delayed_branch = 2;
-        dc->tb_flags |= D_FLAG;
-        tcg_gen_st_i32(tcg_const_i32(dc->type_b && (dc->tb_flags & IMM_FLAG)),
-                      cpu_env, offsetof(CPUMBState, bimm));
+        dec_setup_dslot(dc);
     }
 
     if (dec_alu_op_b_is_small_imm(dc)) {
@@ -1256,10 +1259,7 @@ static void dec_br(DisasContext *dc)
 
     dc->delayed_branch = 1;
     if (dslot) {
-        dc->delayed_branch = 2;
-        dc->tb_flags |= D_FLAG;
-        tcg_gen_st_i32(tcg_const_i32(dc->type_b && (dc->tb_flags & IMM_FLAG)),
-                      cpu_env, offsetof(CPUMBState, bimm));
+        dec_setup_dslot(dc);
     }
     if (link && dc->rd)
         tcg_gen_movi_i32(cpu_R[dc->rd], dc->pc);
@@ -1361,10 +1361,7 @@ static void dec_rts(DisasContext *dc)
         return;
     }
 
-    dc->delayed_branch = 2;
-    dc->tb_flags |= D_FLAG;
-    tcg_gen_st_i32(tcg_const_i32(dc->type_b && (dc->tb_flags & IMM_FLAG)),
-                  cpu_env, offsetof(CPUMBState, bimm));
+    dec_setup_dslot(dc);
 
     if (i_bit) {
         LOG_DIS("rtid ir=%x\n", dc->ir);
@@ -1395,7 +1392,7 @@ static int dec_check_fpuv2(DisasContext *dc)
         tcg_gen_movi_i64(cpu_SR[SR_ESR], ESR_EC_FPU);
         t_gen_raise_exception(dc, EXCP_HW_EXCP);
     }
-    return (dc->cpu->cfg.use_fpu == 2) ? 0 : PVR2_USE_FPU2_MASK;
+    return (dc->cpu->cfg.use_fpu == 2) ? PVR2_USE_FPU2_MASK : 0;
 }
 
 static void dec_fpu(DisasContext *dc)
@@ -1577,7 +1574,7 @@ static inline void decode(DisasContext *dc, uint32_t ir)
     LOG_DIS("%8.8x\t", dc->ir);
 
     if (ir == 0) {
-        trap_illegal(dc, dc->cpu->env.pvr.regs[2] & PVR2_OPCODE_0x0_ILL_MASK);
+        trap_illegal(dc, dc->cpu->cfg.opcode_0_illegal);
         /* Don't decode nop/zero instructions any further.  */
         return;
     }
@@ -1685,7 +1682,10 @@ void gen_intermediate_code(CPUState *cs, TranslationBlock *tb, int max_insns)
                 dc->tb_flags &= ~D_FLAG;
                 /* If it is a direct jump, try direct chaining.  */
                 if (dc->jmp == JMP_INDIRECT) {
-                    eval_cond_jmp(dc, env_btarget, tcg_const_i64(dc->pc));
+                    TCGv_i64 tmp_pc = tcg_const_i64(dc->pc);
+                    eval_cond_jmp(dc, env_btarget, tmp_pc);
+                    tcg_temp_free_i64(tmp_pc);
+
                     dc->is_jmp = DISAS_JUMP;
                 } else if (dc->jmp == JMP_DIRECT) {
                     t_sync_flags(dc);
@@ -1724,8 +1724,6 @@ void gen_intermediate_code(CPUState *cs, TranslationBlock *tb, int max_insns)
             npc = dc->jmp_pc;
     }
 
-    if (tb_cflags(tb) & CF_LAST_IO)
-        gen_io_end();
     /* Force an update if the per-tb cpu state has changed.  */
     if (dc->is_jmp == DISAS_NEXT
         && (dc->cpustate_changed || org_flags != dc->tb_flags)) {
@@ -1768,10 +1766,10 @@ void gen_intermediate_code(CPUState *cs, TranslationBlock *tb, int max_insns)
 #if !SIM_COMPAT
     if (qemu_loglevel_mask(CPU_LOG_TB_IN_ASM)
         && qemu_log_in_addr_range(pc_start)) {
-        qemu_log_lock();
+        FILE *logfile = qemu_log_lock();
         qemu_log("--------------\n");
         log_target_disas(cs, pc_start, dc->pc - pc_start);
-        qemu_log_unlock();
+        qemu_log_unlock(logfile);
     }
 #endif
 #endif
@@ -1791,9 +1789,11 @@ void mb_cpu_dump_state(CPUState *cs, FILE *f, int flags)
     qemu_fprintf(f, "IN: PC=%" PRIx64 " %s\n",
                  env->sregs[SR_PC], lookup_symbol(env->sregs[SR_PC]));
     qemu_fprintf(f, "rmsr=%" PRIx64 " resr=%" PRIx64 " rear=%" PRIx64 " "
-                 "debug=%x imm=%x iflags=%x fsr=%" PRIx64 "\n",
+                 "debug=%x imm=%x iflags=%x fsr=%" PRIx64 " "
+                 "rbtr=%" PRIx64 "\n",
                  env->sregs[SR_MSR], env->sregs[SR_ESR], env->sregs[SR_EAR],
-                 env->debug, env->imm, env->iflags, env->sregs[SR_FSR]);
+                 env->debug, env->imm, env->iflags, env->sregs[SR_FSR],
+                 env->sregs[SR_BTR]);
     qemu_fprintf(f, "btaken=%d btarget=%" PRIx64 " mode=%s(saved=%s) "
                  "eip=%d ie=%d\n",
                  env->btaken, env->btarget,
@@ -1801,7 +1801,17 @@ void mb_cpu_dump_state(CPUState *cs, FILE *f, int flags)
                  (env->sregs[SR_MSR] & MSR_UMS) ? "user" : "kernel",
                  (bool)(env->sregs[SR_MSR] & MSR_EIP),
                  (bool)(env->sregs[SR_MSR] & MSR_IE));
+    for (i = 0; i < 12; i++) {
+        qemu_fprintf(f, "rpvr%2.2d=%8.8x ", i, env->pvr.regs[i]);
+        if ((i + 1) % 4 == 0) {
+            qemu_fprintf(f, "\n");
+        }
+    }
 
+    /* Registers that aren't modeled are reported as 0 */
+    qemu_fprintf(f, "redr=%" PRIx64 " rpid=0 rzpr=0 rtlbx=0 rtlbsx=0 "
+                    "rtlblo=0 rtlbhi=0\n", env->sregs[SR_EDR]);
+    qemu_fprintf(f, "slr=%x shr=%x\n", env->slr, env->shr);
     for (i = 0; i < 32; i++) {
         qemu_fprintf(f, "r%2.2d=%8.8x ", i, env->regs[i]);
         if ((i + 1) % 4 == 0)

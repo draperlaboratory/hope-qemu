@@ -27,14 +27,13 @@
 #include "qemu/osdep.h"
 #include "hw/acpi/pcihp.h"
 
-#include "hw/hw.h"
-#include "hw/i386/pc.h"
+#include "hw/pci-host/i440fx.h"
 #include "hw/pci/pci.h"
 #include "hw/pci/pci_bridge.h"
 #include "hw/acpi/acpi.h"
-#include "sysemu/sysemu.h"
 #include "exec/address-spaces.h"
 #include "hw/pci/pci_bus.h"
+#include "migration/vmstate.h"
 #include "qapi/error.h"
 #include "qom/qom-qobject.h"
 #include "trace.h"
@@ -81,7 +80,7 @@ static void *acpi_set_bsel(PCIBus *bus, void *opaque)
 
         *bus_bsel = (*bsel_alloc)++;
         object_property_add_uint32_ptr(OBJECT(bus), ACPI_PCIHP_PROP_BSEL,
-                                       bus_bsel, &error_abort);
+                                       bus_bsel, OBJ_PROP_FLAG_READ);
     }
 
     return bsel_alloc;
@@ -154,7 +153,7 @@ static void acpi_pcihp_eject_slot(AcpiPciHpState *s, unsigned bsel, unsigned slo
 
     trace_acpi_pci_eject_slot(bsel, slot);
 
-    if (!bus) {
+    if (!bus || slot > 31) {
         return;
     }
 
@@ -247,8 +246,7 @@ void acpi_pcihp_device_plug_cb(HotplugHandler *hotplug_dev, AcpiPciHpState *s,
             object_dynamic_cast(OBJECT(dev), TYPE_PCI_BRIDGE)) {
             PCIBus *sec = pci_bridge_get_sec_bus(PCI_BRIDGE(pdev));
 
-            qbus_set_hotplug_handler(BUS(sec), OBJECT(hotplug_dev),
-                                     &error_abort);
+            qbus_set_hotplug_handler(BUS(sec), OBJECT(hotplug_dev));
             /* We don't have to overwrite any other hotplug handler yet */
             assert(QLIST_EMPTY(&sec->child));
         }
@@ -267,7 +265,7 @@ void acpi_pcihp_device_unplug_cb(HotplugHandler *hotplug_dev, AcpiPciHpState *s,
 {
     trace_acpi_pci_unplug(PCI_SLOT(PCI_DEVICE(dev)->devfn),
                           acpi_pcihp_get_bsel(pci_get_bus(PCI_DEVICE(dev))));
-    object_property_set_bool(OBJECT(dev), false, "realized", NULL);
+    qdev_unrealize(dev);
 }
 
 void acpi_pcihp_device_unplug_request_cb(HotplugHandler *hotplug_dev,
@@ -374,9 +372,9 @@ void acpi_pcihp_init(Object *owner, AcpiPciHpState *s, PCIBus *root_bus,
     memory_region_add_subregion(address_space_io, s->io_base, &s->io);
 
     object_property_add_uint16_ptr(owner, ACPI_PCIHP_IO_BASE_PROP, &s->io_base,
-                                   &error_abort);
+                                   OBJ_PROP_FLAG_READ);
     object_property_add_uint16_ptr(owner, ACPI_PCIHP_IO_LEN_PROP, &s->io_len,
-                                   &error_abort);
+                                   OBJ_PROP_FLAG_READ);
 }
 
 const VMStateDescription vmstate_acpi_pcihp_pci_status = {

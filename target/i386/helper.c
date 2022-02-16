@@ -22,9 +22,9 @@
 #include "exec/exec-all.h"
 #include "qemu/qemu-print.h"
 #include "sysemu/kvm.h"
+#include "sysemu/runstate.h"
 #include "kvm_i386.h"
 #ifndef CONFIG_USER_ONLY
-#include "sysemu/sysemu.h"
 #include "sysemu/tcg.h"
 #include "sysemu/hw_accel.h"
 #include "monitor/monitor.h"
@@ -370,10 +370,11 @@ void x86_cpu_dump_local_apic_state(CPUState *cs, int flags)
     dump_apic_lvt("LVTTHMR", lvt[APIC_LVT_THERMAL], false);
     dump_apic_lvt("LVTT", lvt[APIC_LVT_TIMER], true);
 
-    qemu_printf("Timer\t DCR=0x%x (divide by %u) initial_count = %u\n",
+    qemu_printf("Timer\t DCR=0x%x (divide by %u) initial_count = %u"
+                " current_count = %u\n",
                 s->divide_conf & APIC_DCR_MASK,
                 divider_conf(s->divide_conf),
-                s->initial_count);
+                s->initial_count, apic_get_current_count(s));
 
     qemu_printf("SPIV\t 0x%08x APIC %s, focus=%s, spurious vec %u\n",
                 s->spurious_vec,
@@ -544,6 +545,7 @@ void x86_cpu_dump_state(CPUState *cs, FILE *f, int flags)
         for(i = 0; i < 8; i++) {
             fptag |= ((!env->fptags[i]) << i);
         }
+        update_mxcsr_from_sse_status(env);
         qemu_fprintf(f, "FCW=%04x FSW=%04x [ST=%d] FTW=%02x MXCSR=%08x\n",
                      env->fpuc,
                      (env->fpus & ~0x3800) | (env->fpstt & 0x7) << 11,
@@ -715,7 +717,8 @@ void cpu_x86_update_cr4(CPUX86State *env, uint32_t new_cr4)
 }
 
 #if !defined(CONFIG_USER_ONLY)
-hwaddr x86_cpu_get_phys_page_debug(CPUState *cs, vaddr addr)
+hwaddr x86_cpu_get_phys_page_attrs_debug(CPUState *cs, vaddr addr,
+                                         MemTxAttrs *attrs)
 {
     X86CPU *cpu = X86_CPU(cs);
     CPUX86State *env = &cpu->env;
@@ -724,6 +727,8 @@ hwaddr x86_cpu_get_phys_page_debug(CPUState *cs, vaddr addr)
     int32_t a20_mask;
     uint32_t page_offset;
     int page_size;
+
+    *attrs = cpu_get_mem_attrs(env);
 
     a20_mask = x86_get_a20_mask(env);
     if (!(env->cr[0] & CR0_PG_MASK)) {

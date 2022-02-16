@@ -23,11 +23,12 @@
  */
 
 #include "qemu/osdep.h"
-#include "hw/hw.h"
 #include "hw/audio/soundhw.h"
 #include "audio/audio.h"
+#include "hw/irq.h"
 #include "hw/isa/isa.h"
-#include "hw/qdev.h"
+#include "hw/qdev-properties.h"
+#include "migration/vmstate.h"
 #include "qemu/timer.h"
 #include "qemu/host-utils.h"
 #include "qemu/log.h"
@@ -1168,7 +1169,7 @@ static int write_audio (SB16State *s, int nchan, int dma_pos,
         int copied;
         size_t to_copy;
 
-        to_copy = audio_MIN (temp, left);
+        to_copy = MIN (temp, left);
         if (to_copy > sizeof (tmpbuf)) {
             to_copy = sizeof (tmpbuf);
         }
@@ -1414,13 +1415,8 @@ static void sb16_realizefn (DeviceState *dev, Error **errp)
     AUD_register_card ("sb16", &s->card);
 }
 
-static int SB16_init (ISABus *bus)
-{
-    isa_create_simple (bus, TYPE_SB16);
-    return 0;
-}
-
 static Property sb16_properties[] = {
+    DEFINE_AUDIO_PROPERTIES(SB16State, card),
     DEFINE_PROP_UINT32 ("version", SB16State, ver,  0x0405), /* 4.5 */
     DEFINE_PROP_UINT32 ("iobase",  SB16State, port, 0x220),
     DEFINE_PROP_UINT32 ("irq",     SB16State, irq,  5),
@@ -1437,7 +1433,7 @@ static void sb16_class_initfn (ObjectClass *klass, void *data)
     set_bit(DEVICE_CATEGORY_SOUND, dc->categories);
     dc->desc = "Creative Sound Blaster 16";
     dc->vmsd = &vmstate_sb16;
-    dc->props = sb16_properties;
+    device_class_set_props(dc, sb16_properties);
 }
 
 static const TypeInfo sb16_info = {
@@ -1451,7 +1447,8 @@ static const TypeInfo sb16_info = {
 static void sb16_register_types (void)
 {
     type_register_static (&sb16_info);
-    isa_register_soundhw("sb16", "Creative Sound Blaster 16", SB16_init);
+    deprecated_register_soundhw("sb16", "Creative Sound Blaster 16",
+                                1, TYPE_SB16);
 }
 
 type_init (sb16_register_types)

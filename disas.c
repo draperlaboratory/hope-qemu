@@ -39,9 +39,11 @@ target_read_memory (bfd_vma memaddr,
                     struct disassemble_info *info)
 {
     CPUDebug *s = container_of(info, CPUDebug, info);
+    int r;
 
-    cpu_memory_rw_debug(s->cpu, memaddr, myaddr, length, 0);
-    return 0;
+    r = cpu_memory_rw_debug(s->cpu, memaddr, myaddr, length, 0);
+
+    return r ? EIO : 0;
 }
 
 /* Print an error message.  We can assume that this is in response to
@@ -260,7 +262,8 @@ static void cap_dump_insn_units(disassemble_info *info, cs_insn *insn,
     }
 }
 
-static void cap_dump_insn(disassemble_info *info, cs_insn *insn)
+static void cap_dump_insn(disassemble_info *info, cs_insn *insn,
+                          const char *note)
 {
     fprintf_function print = info->fprintf_func;
     int i, n, split;
@@ -281,7 +284,11 @@ static void cap_dump_insn(disassemble_info *info, cs_insn *insn)
     }
 
     /* Print the actual instruction.  */
-    print(info->stream, "  %-8s %s\n", insn->mnemonic, insn->op_str);
+    print(info->stream, "  %-8s %s", insn->mnemonic, insn->op_str);
+    if (note) {
+        print(info->stream, "\t\t%s", note);
+    }
+    print(info->stream, "\n");
 
     /* Dump any remaining part of the insn on subsequent lines.  */
     for (i = split; i < n; i += split) {
@@ -313,7 +320,7 @@ static bool cap_disas_target(disassemble_info *info, uint64_t pc, size_t size)
         size -= tsize;
 
         while (cs_disasm_iter(handle, &cbuf, &csize, &pc, insn)) {
-           cap_dump_insn(info, insn);
+            cap_dump_insn(info, insn, NULL);
         }
 
         /* If the target memory is not consumed, go back for more... */
@@ -342,7 +349,8 @@ static bool cap_disas_target(disassemble_info *info, uint64_t pc, size_t size)
 }
 
 /* Disassemble SIZE bytes at CODE for the host.  */
-static bool cap_disas_host(disassemble_info *info, void *code, size_t size)
+static bool cap_disas_host(disassemble_info *info, void *code, size_t size,
+                           const char *note)
 {
     csh handle;
     const uint8_t *cbuf;
@@ -358,7 +366,8 @@ static bool cap_disas_host(disassemble_info *info, void *code, size_t size)
     pc = (uintptr_t)code;
 
     while (cs_disasm_iter(handle, &cbuf, &size, &pc, insn)) {
-       cap_dump_insn(info, insn);
+        cap_dump_insn(info, insn, note);
+        note = NULL;
     }
     if (size != 0) {
         (*info->fprintf_func)(info->stream,
@@ -402,7 +411,7 @@ static bool cap_disas_monitor(disassemble_info *info, uint64_t pc, int count)
         csize += tsize;
 
         if (cs_disasm_iter(handle, &cbuf, &csize, &pc, insn)) {
-            cap_dump_insn(info, insn);
+            cap_dump_insn(info, insn, NULL);
             if (--count <= 0) {
                 break;
             }
@@ -416,8 +425,9 @@ static bool cap_disas_monitor(disassemble_info *info, uint64_t pc, int count)
 #endif /* !CONFIG_USER_ONLY */
 #else
 # define cap_disas_target(i, p, s)  false
-# define cap_disas_host(i, p, s)  false
+# define cap_disas_host(i, p, s, n)  false
 # define cap_disas_monitor(i, p, c)  false
+# define cap_disas_plugin(i, p, c) false
 #endif /* CONFIG_CAPSTONE */
 
 /* Disassemble this for me please... (debugging).  */
@@ -475,8 +485,117 @@ void target_disas(FILE *out, CPUState *cpu, target_ulong code,
     }
 }
 
+static __thread GString plugin_disas_output;
+
+static int plugin_printf(FILE *stream, const char *fmt, ...)
+{
+    va_list va;
+    GString *s = &plugin_disas_output;
+    int initial_len = s->len;
+
+    va_start(va, fmt);
+    g_string_append_vprintf(s, fmt, va);
+    va_end(va);
+
+    return s->len - initial_len;
+}
+
+static void plugin_print_address(bfd_vma addr, struct disassemble_info *info)
+{
+    /* does nothing */
+}
+
+
+#ifdef CONFIG_CAPSTONE
+/* Disassemble a single instruction directly into plugin output */
+static
+bool cap_disas_plugin(disassemble_info *info, uint64_t pc, size_t size)
+{
+    uint8_t cap_buf[1024];
+    csh handle;
+    cs_insn *insn;
+    size_t csize = 0;
+    int count;
+    GString *s = &plugin_disas_output;
+
+    if (cap_disas_start(info, &handle) != CS_ERR_OK) {
+        return false;
+    }
+    insn = cap_insn;
+
+    size_t tsize = MIN(sizeof(cap_buf) - csize, size);
+    const uint8_t *cbuf = cap_buf;
+    target_read_memory(pc, cap_buf, tsize, info);
+
+    count = cs_disasm(handle, cbuf, size, 0, 1, &insn);
+
+    if (count) {
+        g_string_printf(s, "%s %s", insn->mnemonic, insn->op_str);
+    } else {
+        g_string_printf(s, "cs_disasm failed");
+    }
+
+    cs_close(&handle);
+    return true;
+}
+#endif
+
+/*
+ * We should only be dissembling one instruction at a time here. If
+ * there is left over it usually indicates the front end has read more
+ * bytes than it needed.
+ */
+char *plugin_disas(CPUState *cpu, uint64_t addr, size_t size)
+{
+    CPUClass *cc = CPU_GET_CLASS(cpu);
+    int count;
+    CPUDebug s;
+    GString *ds = g_string_set_size(&plugin_disas_output, 0);
+
+    g_assert(ds == &plugin_disas_output);
+
+    INIT_DISASSEMBLE_INFO(s.info, NULL, plugin_printf);
+
+    s.cpu = cpu;
+    s.info.read_memory_func = target_read_memory;
+    s.info.buffer_vma = addr;
+    s.info.buffer_length = size;
+    s.info.print_address_func = plugin_print_address;
+    s.info.cap_arch = -1;
+    s.info.cap_mode = 0;
+    s.info.cap_insn_unit = 4;
+    s.info.cap_insn_split = 4;
+
+#ifdef TARGET_WORDS_BIGENDIAN
+    s.info.endian = BFD_ENDIAN_BIG;
+#else
+    s.info.endian = BFD_ENDIAN_LITTLE;
+#endif
+
+    if (cc->disas_set_info) {
+        cc->disas_set_info(cpu, &s.info);
+    }
+
+    if (s.info.cap_arch >= 0 && cap_disas_plugin(&s.info, addr, size)) {
+        return g_strdup(ds->str);
+    }
+
+    if (s.info.print_insn == NULL) {
+        s.info.print_insn = print_insn_od_target;
+    }
+
+    count = s.info.print_insn(addr, &s.info);
+
+    /* The decoder probably read more than it needed it's not critical */
+    if (count < size) {
+        warn_report("%s: %zu bytes left over", __func__, size - count);
+    }
+
+    return g_strdup(ds->str);
+}
+
 /* Disassemble this for me please... (debugging). */
-void disas(FILE *out, void *code, unsigned long size)
+void disas(FILE *out, void *code, unsigned long size, const char *note)
 {
     uintptr_t pc;
     int count;
@@ -554,7 +673,7 @@ void disas(FILE *out, void *code, unsigned long size)
     print_insn = print_insn_hppa;
 #endif
 
-    if (s.info.cap_arch >= 0 && cap_disas_host(&s.info, code, size)) {
+    if (s.info.cap_arch >= 0 && cap_disas_host(&s.info, code, size, note)) {
         return;
     }
 
@@ -564,10 +683,16 @@ void disas(FILE *out, void *code, unsigned long size)
     for (pc = (uintptr_t)code; size > 0; pc += count, size -= count) {
         fprintf(out, "0x%08" PRIxPTR ":  ", pc);
         count = print_insn(pc, &s.info);
-	fprintf(out, "\n");
-	if (count < 0)
-	    break;
+        if (note) {
+            fprintf(out, "\t\t%s", note);
+            note = NULL;
+        }
+        fprintf(out, "\n");
+        if (count < 0) {
+            break;
+        }
     }
+
 }
 
 /* Look up symbol for debugging purpose.  Returns "" if unknown. */
@@ -595,10 +720,11 @@ physical_read_memory(bfd_vma memaddr, bfd_byte *myaddr, int length,
                      struct disassemble_info *info)
 {
     CPUDebug *s = container_of(info, CPUDebug, info);
+    MemTxResult res;
 
-    address_space_read(s->cpu->as, memaddr, MEMTXATTRS_UNSPECIFIED,
-                       myaddr, length);
-    return 0;
+    res = address_space_read(s->cpu->as, memaddr, MEMTXATTRS_UNSPECIFIED,
+                             myaddr, length);
+    return res == MEMTX_OK ? 0 : EIO;
 }
 
 /* Disassembler for the monitor.  */

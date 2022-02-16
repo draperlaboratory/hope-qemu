@@ -12,7 +12,6 @@
 
 
 #include "qemu/osdep.h"
-#include "hw/qdev.h"
 #include "qapi/error.h"
 #include "qapi/qmp/qerror.h"
 #include "qemu/error-report.h"
@@ -47,7 +46,7 @@ vhost_user_backend_dev_init(VhostUserBackend *b, VirtIODevice *vdev,
 
     b->vdev = vdev;
     b->dev.nvqs = nvqs;
-    b->dev.vqs = g_new(struct vhost_virtqueue, nvqs);
+    b->dev.vqs = g_new0(struct vhost_virtqueue, nvqs);
 
     ret = vhost_dev_init(&b->dev, &b->vhost_user, VHOST_BACKEND_TYPE_USER, 0);
     if (ret < 0) {
@@ -178,7 +177,7 @@ static char *get_chardev(Object *obj, Error **errp)
 
 static void vhost_user_backend_init(Object *obj)
 {
-    object_property_add_str(obj, "chardev", get_chardev, set_chardev, NULL);
+    object_property_add_str(obj, "chardev", get_chardev, set_chardev);
 }
 
 static void vhost_user_backend_finalize(Object *obj)

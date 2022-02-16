@@ -11,9 +11,10 @@
 
 #include "qemu/osdep.h"
 #include "hw/sysbus.h"
+#include "hw/irq.h"
 #include "hw/ptimer.h"
-#include "qemu/main-loop.h"
 #include "qemu/module.h"
+#include "qemu/log.h"
 
 #undef DEBUG_PUV3
 #include "hw/unicore32/puv3.h"
@@ -26,7 +27,6 @@ typedef struct PUV3OSTState {
     SysBusDevice parent_obj;
 
     MemoryRegion iomem;
-    QEMUBH *bh;
     qemu_irq irq;
     ptimer_state *ptimer;
 
@@ -53,7 +53,9 @@ static uint64_t puv3_ost_read(void *opaque, hwaddr offset,
         ret = s->reg_OIER;
         break;
     default:
-        DPRINTF("Bad offset %x\n", (int)offset);
+        qemu_log_mask(LOG_GUEST_ERROR,
+                      "%s: Bad read offset 0x%"HWADDR_PRIx"\n",
+                      __func__, offset);
     }
     DPRINTF("offset 0x%x, value 0x%x\n", offset, ret);
     return ret;
@@ -67,6 +69,7 @@ static void puv3_ost_write(void *opaque, hwaddr offset,
     DPRINTF("offset 0x%x, value 0x%x\n", offset, value);
     switch (offset) {
     case 0x00: /* Match Register 0 */
+        ptimer_transaction_begin(s->ptimer);
         s->reg_OSMR0 = value;
         if (s->reg_OSMR0 > s->reg_OSCR) {
             ptimer_set_count(s->ptimer, s->reg_OSMR0 - s->reg_OSCR);
@@ -75,6 +78,7 @@ static void puv3_ost_write(void *opaque, hwaddr offset,
                     (0xffffffff - s->reg_OSCR));
         }
         ptimer_run(s->ptimer, 2);
+        ptimer_transaction_commit(s->ptimer);
         break;
     case 0x14: /* Status Register */
         assert(value == 0);
@@ -87,7 +91,9 @@ static void puv3_ost_write(void *opaque, hwaddr offset,
         s->reg_OIER = value;
         break;
     default:
-        DPRINTF("Bad offset %x\n", (int)offset);
+        qemu_log_mask(LOG_GUEST_ERROR,
+                      "%s: Bad write offset 0x%"HWADDR_PRIx"\n",
+                      __func__, offset);
     }
 }
 
@@ -127,9 +133,10 @@ static void puv3_ost_realize(DeviceState *dev, Error **errp)
 
     sysbus_init_irq(sbd, &s->irq);
 
-    s->bh = qemu_bh_new(puv3_ost_tick, s);
-    s->ptimer = ptimer_init(s->bh, PTIMER_POLICY_DEFAULT);
+    s->ptimer = ptimer_init(puv3_ost_tick, s, PTIMER_POLICY_DEFAULT);
+    ptimer_transaction_begin(s->ptimer);
     ptimer_set_freq(s->ptimer, 50 * 1000 * 1000);
+    ptimer_transaction_commit(s->ptimer);
 
     memory_region_init_io(&s->iomem, OBJECT(s), &puv3_ost_ops, s, "puv3_ost",
             PUV3_REGS_OFFSET);

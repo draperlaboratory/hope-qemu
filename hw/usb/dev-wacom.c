@@ -27,9 +27,9 @@
  */
 
 #include "qemu/osdep.h"
-#include "hw/hw.h"
 #include "ui/console.h"
 #include "hw/usb.h"
+#include "migration/vmstate.h"
 #include "qemu/module.h"
 #include "desc.h"
 
@@ -331,7 +331,7 @@ static void usb_wacom_handle_data(USBDevice *dev, USBPacket *p)
     }
 }
 
-static void usb_wacom_unrealize(USBDevice *dev, Error **errp)
+static void usb_wacom_unrealize(USBDevice *dev)
 {
     USBWacomState *s = (USBWacomState *) dev;
 

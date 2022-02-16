@@ -25,7 +25,9 @@
 
 #include "qemu/osdep.h"
 #include "qapi/error.h"
+#include "hw/qdev-properties.h"
 #include "hw/usb.h"
+#include "migration/vmstate.h"
 #include "desc.h"
 #include "net/net.h"
 #include "qemu/error-report.h"
@@ -624,7 +626,7 @@ static const uint32_t oid_supported_list[] =
 struct rndis_response {
     QTAILQ_ENTRY(rndis_response) entries;
     uint32_t length;
-    uint8_t buf[0];
+    uint8_t buf[];
 };
 
 typedef struct USBNetState {
@@ -1324,7 +1326,7 @@ static void usbnet_cleanup(NetClientState *nc)
     s->nic = NULL;
 }
 
-static void usb_net_unrealize(USBDevice *dev, Error **errp)
+static void usb_net_unrealize(USBDevice *dev)
 {
     USBNetState *s = (USBNetState *) dev;
 
@@ -1340,7 +1342,7 @@ static NetClientInfo net_usbnet_info = {
     .cleanup = usbnet_cleanup,
 };
 
-static void usb_net_realize(USBDevice *dev, Error **errrp)
+static void usb_net_realize(USBDevice *dev, Error **errp)
 {
     USBNetState *s = USB_NET(dev);
 
@@ -1379,7 +1381,7 @@ static void usb_net_instance_init(Object *obj)
 
     device_add_bootindex_property(obj, &s->conf.bootindex,
                                   "bootindex", "/ethernet-phy@0",
-                                  &dev->qdev, NULL);
+                                  &dev->qdev);
 }
 
 static const VMStateDescription vmstate_usb_net = {
@@ -1407,7 +1409,7 @@ static void usb_net_class_initfn(ObjectClass *klass, void *data)
     set_bit(DEVICE_CATEGORY_NETWORK, dc->categories);
     dc->fw_name = "network";
     dc->vmsd = &vmstate_usb_net;
-    dc->props = net_properties;
+    device_class_set_props(dc, net_properties);
 }
 
 static const TypeInfo net_info = {

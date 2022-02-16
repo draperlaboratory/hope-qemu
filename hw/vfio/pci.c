@@ -22,24 +22,30 @@
 #include <linux/vfio.h>
 #include <sys/ioctl.h>
 
+#include "hw/hw.h"
 #include "hw/pci/msi.h"
 #include "hw/pci/msix.h"
 #include "hw/pci/pci_bridge.h"
+#include "hw/qdev-properties.h"
+#include "migration/vmstate.h"
 #include "qemu/error-report.h"
+#include "qemu/main-loop.h"
 #include "qemu/module.h"
 #include "qemu/option.h"
 #include "qemu/range.h"
 #include "qemu/units.h"
 #include "sysemu/kvm.h"
+#include "sysemu/runstate.h"
 #include "sysemu/sysemu.h"
 #include "pci.h"
 #include "trace.h"
 #include "qapi/error.h"
+#include "migration/blocker.h"
 
 #define TYPE_VFIO_PCI "vfio-pci"
 #define PCI_VFIO(obj)    OBJECT_CHECK(VFIOPCIDevice, obj, TYPE_VFIO_PCI)
 
-#define TYPE_VIFO_PCI_NOHOTPLUG "vfio-pci-nohotplug"
+#define TYPE_VFIO_PCI_NOHOTPLUG "vfio-pci-nohotplug"
 
 static void vfio_disable_interrupts(VFIOPCIDevice *vdev);
 static void vfio_mmap_set_enabled(VFIOPCIDevice *vdev, bool enabled);
@@ -109,12 +115,7 @@ static void vfio_intx_eoi(VFIODevice *vbasedev)
 static void vfio_intx_enable_kvm(VFIOPCIDevice *vdev, Error **errp)
 {
 #ifdef CONFIG_KVM
-    struct kvm_irqfd irqfd = {
-        .fd = event_notifier_get_fd(&vdev->intx.interrupt),
-        .gsi = vdev->intx.route.irq,
-        .flags = KVM_IRQFD_FLAG_RESAMPLE,
-    };
-    Error *err = NULL;
+    int irq_fd = event_notifier_get_fd(&vdev->intx.interrupt);
 
     if (vdev->no_kvm_intx || !kvm_irqfds_enabled() ||
         vdev->intx.route.mode != PCI_INTX_ENABLED ||
@@ -123,7 +124,7 @@ static void vfio_intx_enable_kvm(VFIOPCIDevice *vdev, Error **errp)
     }
 
     /* Get to a known interrupt state */
-    qemu_set_fd_handler(irqfd.fd, NULL, NULL, vdev);
+    qemu_set_fd_handler(irq_fd, NULL, NULL, vdev);
     vfio_mask_single_irqindex(&vdev->vbasedev, VFIO_PCI_INTX_IRQ_INDEX);
     vdev->intx.pending = false;
     pci_irq_deassert(&vdev->pdev);
@@ -134,18 +135,18 @@ static void vfio_intx_enable_kvm(VFIOPCIDevice *vdev, Error **errp)
         goto fail;
     }
 
-    /* KVM triggers it, VFIO listens for it */
-    irqfd.resamplefd = event_notifier_get_fd(&vdev->intx.unmask);
-
-    if (kvm_vm_ioctl(kvm_state, KVM_IRQFD, &irqfd)) {
+    if (kvm_irqchip_add_irqfd_notifier_gsi(kvm_state,
+                                           &vdev->intx.interrupt,
+                                           &vdev->intx.unmask,
+                                           vdev->intx.route.irq)) {
         error_setg_errno(errp, errno, "failed to setup resample irqfd");
         goto fail_irqfd;
     }
 
     if (vfio_set_irq_signaling(&vdev->vbasedev, VFIO_PCI_INTX_IRQ_INDEX, 0,
                                VFIO_IRQ_SET_ACTION_UNMASK,
-                               irqfd.resamplefd, &err)) {
-        error_propagate(errp, err);
+                               event_notifier_get_fd(&vdev->intx.unmask),
+                               errp)) {
         goto fail_vfio;
     }
 
@@ -159,12 +160,12 @@ static void vfio_intx_enable_kvm(VFIOPCIDevice *vdev, Error **errp)
     return;
 
 fail_vfio:
-    irqfd.flags = KVM_IRQFD_FLAG_DEASSIGN;
-    kvm_vm_ioctl(kvm_state, KVM_IRQFD, &irqfd);
+    kvm_irqchip_remove_irqfd_notifier_gsi(kvm_state, &vdev->intx.interrupt,
+                                          vdev->intx.route.irq);
 fail_irqfd:
     event_notifier_cleanup(&vdev->intx.unmask);
 fail:
-    qemu_set_fd_handler(irqfd.fd, vfio_intx_interrupt, NULL, vdev);
+    qemu_set_fd_handler(irq_fd, vfio_intx_interrupt, NULL, vdev);
     vfio_unmask_single_irqindex(&vdev->vbasedev, VFIO_PCI_INTX_IRQ_INDEX);
 #endif
 }
@@ -172,12 +173,6 @@ fail:
 static void vfio_intx_disable_kvm(VFIOPCIDevice *vdev)
 {
 #ifdef CONFIG_KVM
-    struct kvm_irqfd irqfd = {
-        .fd = event_notifier_get_fd(&vdev->intx.interrupt),
-        .gsi = vdev->intx.route.irq,
-        .flags = KVM_IRQFD_FLAG_DEASSIGN,
-    };
-
     if (!vdev->intx.kvm_accel) {
         return;
     }
@@ -191,7 +186,8 @@ static void vfio_intx_disable_kvm(VFIOPCIDevice *vdev)
     pci_irq_deassert(&vdev->pdev);
 
     /* Tell KVM to stop listening for an INTx irqfd */
-    if (kvm_vm_ioctl(kvm_state, KVM_IRQFD, &irqfd)) {
+    if (kvm_irqchip_remove_irqfd_notifier_gsi(kvm_state, &vdev->intx.interrupt,
+                                              vdev->intx.route.irq)) {
         error_report("vfio: Error: Failed to disable INTx irqfd: %m");
     }
 
@@ -199,7 +195,8 @@ static void vfio_intx_disable_kvm(VFIOPCIDevice *vdev)
     event_notifier_cleanup(&vdev->intx.unmask);
 
     /* QEMU starts listening for interrupt events. */
-    qemu_set_fd_handler(irqfd.fd, vfio_intx_interrupt, NULL, vdev);
+    qemu_set_fd_handler(event_notifier_get_fd(&vdev->intx.interrupt),
+                        vfio_intx_interrupt, NULL, vdev);
 
     vdev->intx.kvm_accel = false;
 
@@ -210,30 +207,18 @@ static void vfio_intx_disable_kvm(VFIOPCIDevice *vdev)
 #endif
 }
 
-static void vfio_intx_update(PCIDevice *pdev)
+static void vfio_intx_update(VFIOPCIDevice *vdev, PCIINTxRoute *route)
 {
-    VFIOPCIDevice *vdev = PCI_VFIO(pdev);
-    PCIINTxRoute route;
     Error *err = NULL;
 
-    if (vdev->interrupt != VFIO_INT_INTx) {
-        return;
-    }
-
-    route = pci_device_route_intx_to_irq(&vdev->pdev, vdev->intx.pin);
-
-    if (!pci_intx_route_changed(&vdev->intx.route, &route)) {
-        return; /* Nothing changed */
-    }
-
     trace_vfio_intx_update(vdev->vbasedev.name,
-                           vdev->intx.route.irq, route.irq);
+                           vdev->intx.route.irq, route->irq);
 
     vfio_intx_disable_kvm(vdev);
 
-    vdev->intx.route = route;
+    vdev->intx.route = *route;
 
-    if (route.mode != PCI_INTX_ENABLED) {
+    if (route->mode != PCI_INTX_ENABLED) {
         return;
     }
 
@@ -244,6 +229,30 @@ static void vfio_intx_update(PCIDevice *pdev)
 
     /* Re-enable the interrupt in cased we missed an EOI */
     vfio_intx_eoi(&vdev->vbasedev);
+}
+
+static void vfio_intx_routing_notifier(PCIDevice *pdev)
+{
+    VFIOPCIDevice *vdev = PCI_VFIO(pdev);
+    PCIINTxRoute route;
+
+    if (vdev->interrupt != VFIO_INT_INTx) {
+        return;
+    }
+
+    route = pci_device_route_intx_to_irq(&vdev->pdev, vdev->intx.pin);
+
+    if (pci_intx_route_changed(&vdev->intx.route, &route)) {
+        vfio_intx_update(vdev, &route);
+    }
+}
+
+static void vfio_irqchip_change(Notifier *notify, void *data)
+{
+    VFIOPCIDevice *vdev = container_of(notify, VFIOPCIDevice,
+                                       irqchip_change_notifier);
+
+    vfio_intx_update(vdev, &vdev->intx.route);
 }
 
 static int vfio_intx_enable(VFIOPCIDevice *vdev, Error **errp)
@@ -283,8 +292,7 @@ static int vfio_intx_enable(VFIOPCIDevice *vdev, Error **errp)
     qemu_set_fd_handler(fd, vfio_intx_interrupt, NULL, vdev);
 
     if (vfio_set_irq_signaling(&vdev->vbasedev, VFIO_PCI_INTX_IRQ_INDEX, 0,
-                               VFIO_IRQ_SET_ACTION_TRIGGER, fd, &err)) {
-        error_propagate(errp, err);
+                               VFIO_IRQ_SET_ACTION_TRIGGER, fd, errp)) {
         qemu_set_fd_handler(fd, NULL, NULL, vdev);
         event_notifier_cleanup(&vdev->intx.interrupt);
         return -errno;
@@ -646,6 +654,7 @@ retry:
         }
 
         g_free(vdev->msi_vectors);
+        vdev->msi_vectors = NULL;
 
         if (ret > 0 && ret != vdev->nr_vectors) {
             vdev->nr_vectors = ret;
@@ -2726,6 +2735,17 @@ static void vfio_realize(PCIDevice *pdev, Error **errp)
         return;
     }
 
+    if (!pdev->failover_pair_id) {
+        error_setg(&vdev->migration_blocker,
+                "VFIO device doesn't support migration");
+        ret = migrate_add_blocker(vdev->migration_blocker, errp);
+        if (ret) {
+            error_free(vdev->migration_blocker);
+            vdev->migration_blocker = NULL;
+            return;
+        }
+    }
+
     vdev->vbasedev.name = g_path_get_basename(vdev->vbasedev.sysfsdev);
     vdev->vbasedev.ops = &vfio_pci_ops;
     vdev->vbasedev.type = VFIO_DEVICE_TYPE_PCI;
@@ -2765,7 +2785,7 @@ static void vfio_realize(PCIDevice *pdev, Error **errp)
     }
 
     /*
-     * Mediated devices *might* operate compatibly with memory ballooning, but
+     * Mediated devices *might* operate compatibly with discarding of RAM, but
      * we cannot know for certain, it depends on whether the mdev vendor driver
      * stays in sync with the active working set of the guest driver.  Prevent
      * the x-balloon-allowed option unless this is minimally an mdev device.
@@ -2778,7 +2798,7 @@ static void vfio_realize(PCIDevice *pdev, Error **errp)
 
     trace_vfio_mdev(vdev->vbasedev.name, is_mdev);
 
-    if (vdev->vbasedev.balloon_allowed && !is_mdev) {
+    if (vdev->vbasedev.ram_block_discard_allowed && !is_mdev) {
         error_setg(errp, "x-balloon-allowed only potentially compatible "
                    "with mdev devices");
         vfio_put_group(group);
@@ -2948,31 +2968,34 @@ static void vfio_realize(PCIDevice *pdev, Error **errp)
     if (vfio_pci_read_config(&vdev->pdev, PCI_INTERRUPT_PIN, 1)) {
         vdev->intx.mmap_timer = timer_new_ms(QEMU_CLOCK_VIRTUAL,
                                                   vfio_intx_mmap_enable, vdev);
-        pci_device_set_intx_routing_notifier(&vdev->pdev, vfio_intx_update);
+        pci_device_set_intx_routing_notifier(&vdev->pdev,
+                                             vfio_intx_routing_notifier);
+        vdev->irqchip_change_notifier.notify = vfio_irqchip_change;
+        kvm_irqchip_add_change_notifier(&vdev->irqchip_change_notifier);
         ret = vfio_intx_enable(vdev, errp);
         if (ret) {
-            goto out_teardown;
+            goto out_deregister;
         }
     }
 
     if (vdev->display != ON_OFF_AUTO_OFF) {
         ret = vfio_display_probe(vdev, errp);
         if (ret) {
-            goto out_teardown;
+            goto out_deregister;
         }
     }
     if (vdev->enable_ramfb && vdev->dpy == NULL) {
         error_setg(errp, "ramfb=on requires display=on");
-        goto out_teardown;
+        goto out_deregister;
     }
     if (vdev->display_xres || vdev->display_yres) {
         if (vdev->dpy == NULL) {
             error_setg(errp, "xres and yres properties require display=on");
-            goto out_teardown;
+            goto out_deregister;
         }
         if (vdev->dpy->edid_regs == NULL) {
             error_setg(errp, "xres and yres properties need edid support");
-            goto out_teardown;
+            goto out_deregister;
         }
     }
 
@@ -2996,12 +3019,19 @@ static void vfio_realize(PCIDevice *pdev, Error **errp)
 
     return;
 
-out_teardown:
+out_deregister:
     pci_device_set_intx_routing_notifier(&vdev->pdev, NULL);
+    kvm_irqchip_remove_change_notifier(&vdev->irqchip_change_notifier);
+out_teardown:
     vfio_teardown_msi(vdev);
     vfio_bars_exit(vdev);
 error:
     error_prepend(errp, VFIO_MSG_PREFIX, vdev->vbasedev.name);
+    if (vdev->migration_blocker) {
+        migrate_del_blocker(vdev->migration_blocker);
+        error_free(vdev->migration_blocker);
+        vdev->migration_blocker = NULL;
+    }
 }
 
 static void vfio_instance_finalize(Object *obj)
@@ -3013,6 +3043,10 @@ static void vfio_instance_finalize(Object *obj)
     vfio_bars_finalize(vdev);
     g_free(vdev->emulated_config_bits);
     g_free(vdev->rom);
+    if (vdev->migration_blocker) {
+        migrate_del_blocker(vdev->migration_blocker);
+        error_free(vdev->migration_blocker);
+    }
     /*
      * XXX Leaking igd_opregion is not an oversight, we can't remove the
      * fw_cfg entry therefore leaking this allocation seems like the safest
@@ -3031,6 +3065,9 @@ static void vfio_exitfn(PCIDevice *pdev)
     vfio_unregister_req_notifier(vdev);
     vfio_unregister_err_notifier(vdev);
     pci_device_set_intx_routing_notifier(&vdev->pdev, NULL);
+    if (vdev->irqchip_change_notifier.notify) {
+        kvm_irqchip_remove_change_notifier(&vdev->irqchip_change_notifier);
+    }
     vfio_disable_interrupts(vdev);
     if (vdev->intx.mmap_timer) {
         timer_free(vdev->intx.mmap_timer);
@@ -3085,7 +3122,7 @@ static void vfio_instance_init(Object *obj)
 
     device_add_bootindex_property(obj, &vdev->bootindex,
                                   "bootindex", NULL,
-                                  &pci_dev->qdev, NULL);
+                                  &pci_dev->qdev);
     vdev->host.domain = ~0U;
     vdev->host.bus = ~0U;
     vdev->host.slot = ~0U;
@@ -3115,7 +3152,7 @@ static Property vfio_pci_dev_properties[] = {
                     VFIO_FEATURE_ENABLE_IGD_OPREGION_BIT, false),
     DEFINE_PROP_BOOL("x-no-mmap", VFIOPCIDevice, vbasedev.no_mmap, false),
     DEFINE_PROP_BOOL("x-balloon-allowed", VFIOPCIDevice,
-                     vbasedev.balloon_allowed, false),
+                     vbasedev.ram_block_discard_allowed, false),
     DEFINE_PROP_BOOL("x-no-kvm-intx", VFIOPCIDevice, no_kvm_intx, false),
     DEFINE_PROP_BOOL("x-no-kvm-msi", VFIOPCIDevice, no_kvm_msi, false),
     DEFINE_PROP_BOOL("x-no-kvm-msix", VFIOPCIDevice, no_kvm_msix, false),
@@ -3145,19 +3182,13 @@ static Property vfio_pci_dev_properties[] = {
     DEFINE_PROP_END_OF_LIST(),
 };
 
-static const VMStateDescription vfio_pci_vmstate = {
-    .name = "vfio-pci",
-    .unmigratable = 1,
-};
-
 static void vfio_pci_dev_class_init(ObjectClass *klass, void *data)
 {
     DeviceClass *dc = DEVICE_CLASS(klass);
     PCIDeviceClass *pdc = PCI_DEVICE_CLASS(klass);
 
     dc->reset = vfio_pci_reset;
-    dc->props = vfio_pci_dev_properties;
-    dc->vmsd = &vfio_pci_vmstate;
+    device_class_set_props(dc, vfio_pci_dev_properties);
     dc->desc = "VFIO-based PCI device assignment";
     set_bit(DEVICE_CATEGORY_MISC, dc->categories);
     pdc->realize = vfio_realize;
@@ -3189,12 +3220,12 @@ static void vfio_pci_nohotplug_dev_class_init(ObjectClass *klass, void *data)
 {
     DeviceClass *dc = DEVICE_CLASS(klass);
 
-    dc->props = vfio_pci_dev_nohotplug_properties;
+    device_class_set_props(dc, vfio_pci_dev_nohotplug_properties);
     dc->hotpluggable = false;
 }
 
 static const TypeInfo vfio_pci_nohotplug_dev_info = {
-    .name = TYPE_VIFO_PCI_NOHOTPLUG,
+    .name = TYPE_VFIO_PCI_NOHOTPLUG,
     .parent = TYPE_VFIO_PCI,
     .instance_size = sizeof(VFIOPCIDevice),
     .class_init = vfio_pci_nohotplug_dev_class_init,

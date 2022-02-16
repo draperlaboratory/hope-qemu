@@ -138,9 +138,12 @@ static void check_report_connect_error(Chardev *chr,
     SocketChardev *s = SOCKET_CHARDEV(chr);
 
     if (!s->connect_err_reported) {
-        error_report("Unable to connect character device %s: %s",
-                     chr->label, error_get_pretty(err));
+        error_reportf_err(err,
+                          "Unable to connect character device %s: ",
+                          chr->label);
         s->connect_err_reported = true;
+    } else {
+        error_free(err);
     }
     qemu_chr_socket_restart_timer(chr);
 }
@@ -150,7 +153,7 @@ static void tcp_chr_accept(QIONetListener *listener,
                            void *opaque);
 
 static int tcp_chr_read_poll(void *opaque);
-static void tcp_chr_disconnect(Chardev *chr);
+static void tcp_chr_disconnect_locked(Chardev *chr);
 
 /* Called with chr_write_lock held.  */
 static int tcp_chr_write(Chardev *chr, const uint8_t *buf, int len)
@@ -174,15 +177,16 @@ static int tcp_chr_write(Chardev *chr, const uint8_t *buf, int len)
 
         if (ret < 0 && errno != EAGAIN) {
             if (tcp_chr_read_poll(chr) <= 0) {
-                tcp_chr_disconnect(chr);
-                return len;
+                /* Perform disconnect and return error. */
+                tcp_chr_disconnect_locked(chr);
             } /* else let the read handler finish it properly */
         }
 
         return ret;
     } else {
-        /* XXX: indicate an error ? */
-        return len;
+        /* Indicate an error. */
+        errno = EIO;
+        return -1;
     }
 }
 
@@ -469,8 +473,9 @@ static void update_disconnected_filename(SocketChardev *s)
 /* NB may be called even if tcp_chr_connect has not been
  * reached, due to TLS or telnet initialization failure,
  * so can *not* assume s->state == TCP_CHARDEV_STATE_CONNECTED
+ * This must be called with chr->chr_write_lock held.
  */
-static void tcp_chr_disconnect(Chardev *chr)
+static void tcp_chr_disconnect_locked(Chardev *chr)
 {
     SocketChardev *s = SOCKET_CHARDEV(chr);
     bool emit_close = s->state == TCP_CHARDEV_STATE_CONNECTED;
@@ -485,9 +490,16 @@ static void tcp_chr_disconnect(Chardev *chr)
     if (emit_close) {
         qemu_chr_be_event(chr, CHR_EVENT_CLOSED);
     }
-    if (s->reconnect_time) {
+    if (s->reconnect_time && !s->reconnect_timer) {
         qemu_chr_socket_restart_timer(chr);
     }
+}
+
+static void tcp_chr_disconnect(Chardev *chr)
+{
+    qemu_mutex_lock(&chr->chr_write_lock);
+    tcp_chr_disconnect_locked(chr);
+    qemu_mutex_unlock(&chr->chr_write_lock);
 }
 
 static gboolean tcp_chr_read(QIOChannel *chan, GIOCondition cond, void *opaque)
@@ -541,7 +553,9 @@ static int tcp_chr_sync_read(Chardev *chr, const uint8_t *buf, int len)
 
     qio_channel_set_blocking(s->ioc, true, NULL);
     size = tcp_chr_recv(chr, (void *) buf, len);
-    qio_channel_set_blocking(s->ioc, false, NULL);
+    if (s->state != TCP_CHARDEV_STATE_DISCONNECTED) {
+        qio_channel_set_blocking(s->ioc, false, NULL);
+    }
     if (size == 0) {
         /* connection closed */
         tcp_chr_disconnect(chr);
@@ -803,22 +817,20 @@ static void tcp_chr_tls_init(Chardev *chr)
 {
     SocketChardev *s = SOCKET_CHARDEV(chr);
     QIOChannelTLS *tioc;
-    Error *err = NULL;
     gchar *name;
 
     if (s->is_listen) {
         tioc = qio_channel_tls_new_server(
             s->ioc, s->tls_creds,
             s->tls_authz,
-            &err);
+            NULL);
     } else {
         tioc = qio_channel_tls_new_client(
             s->ioc, s->tls_creds,
             s->addr->u.inet.host,
-            &err);
+            NULL);
     }
     if (tioc == NULL) {
-        error_free(err);
         tcp_chr_disconnect(chr);
         return;
     }
@@ -1074,7 +1086,6 @@ static void qemu_chr_socket_connected(QIOTask *task, void *opaque)
     if (qio_task_propagate_error(task, &err)) {
         tcp_chr_change_state(s, TCP_CHARDEV_STATE_DISCONNECTED);
         check_report_connect_error(chr, err);
-        error_free(err);
         goto cleanup;
     }
 
@@ -1118,7 +1129,8 @@ static void tcp_chr_connect_client_async(Chardev *chr)
      */
     s->connect_task = qio_task_new(OBJECT(sioc),
                                    qemu_chr_socket_connected,
-                                   chr, NULL);
+                                   object_ref(OBJECT(chr)),
+                                   (GDestroyNotify)object_unref);
     qio_task_run_in_thread(s->connect_task,
                            tcp_chr_connect_client_task,
                            s->addr,
@@ -1131,8 +1143,10 @@ static gboolean socket_reconnect_timeout(gpointer opaque)
     Chardev *chr = CHARDEV(opaque);
     SocketChardev *s = SOCKET_CHARDEV(opaque);
 
+    qemu_mutex_lock(&chr->chr_write_lock);
     g_source_unref(s->reconnect_timer);
     s->reconnect_timer = NULL;
+    qemu_mutex_unlock(&chr->chr_write_lock);
 
     if (chr->be_open) {
         return false;
@@ -1160,7 +1174,7 @@ static int qmp_chardev_open_socket_server(Chardev *chr,
     qio_net_listener_set_name(s->listener, name);
     g_free(name);
 
-    if (qio_net_listener_open_sync(s->listener, s->addr, errp) < 0) {
+    if (qio_net_listener_open_sync(s->listener, s->addr, 1, errp) < 0) {
         object_unref(OBJECT(s->listener));
         s->listener = NULL;
         return -1;
@@ -1370,6 +1384,8 @@ static void qemu_chr_parse_socket(QemuOpts *opts, ChardevBackend *backend,
     const char *host = qemu_opt_get(opts, "host");
     const char *port = qemu_opt_get(opts, "port");
     const char *fd = qemu_opt_get(opts, "fd");
+    bool tight = qemu_opt_get_bool(opts, "tight", true);
+    bool abstract = qemu_opt_get_bool(opts, "abstract", false);
     SocketAddressLegacy *addr;
     ChardevSocket *sock;
 
@@ -1421,6 +1437,8 @@ static void qemu_chr_parse_socket(QemuOpts *opts, ChardevBackend *backend,
         addr->type = SOCKET_ADDRESS_LEGACY_KIND_UNIX;
         q_unix = addr->u.q_unix.data = g_new0(UnixSocketAddress, 1);
         q_unix->path = g_strdup(path);
+        q_unix->tight = tight;
+        q_unix->abstract = abstract;
     } else if (host) {
         addr->type = SOCKET_ADDRESS_LEGACY_KIND_INET;
         addr->u.inet.data = g_new(InetSocketAddress, 1);
@@ -1479,10 +1497,10 @@ static void char_socket_class_init(ObjectClass *oc, void *data)
 
     object_class_property_add(oc, "addr", "SocketAddress",
                               char_socket_get_addr, NULL,
-                              NULL, NULL, &error_abort);
+                              NULL, NULL);
 
     object_class_property_add_bool(oc, "connected", char_socket_get_connected,
-                                   NULL, &error_abort);
+                                   NULL);
 }
 
 static const TypeInfo char_socket_type_info = {

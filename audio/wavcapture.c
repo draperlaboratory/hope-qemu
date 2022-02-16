@@ -1,5 +1,4 @@
 #include "qemu/osdep.h"
-#include "hw/hw.h"
 #include "monitor/monitor.h"
 #include "qapi/error.h"
 #include "qemu/error-report.h"
@@ -72,7 +71,7 @@ static void wav_destroy (void *opaque)
     g_free (wav->path);
 }
 
-static void wav_capture (void *opaque, void *buf, int size)
+static void wav_capture(void *opaque, const void *buf, int size)
 {
     WAVState *wav = opaque;
 
@@ -105,8 +104,8 @@ static struct capture_ops wav_capture_ops = {
     .info = wav_capture_info
 };
 
-int wav_start_capture (CaptureState *s, const char *path, int freq,
-                       int bits, int nchannels)
+int wav_start_capture(AudioState *state, CaptureState *s, const char *path,
+                      int freq, int bits, int nchannels)
 {
     WAVState *wav;
     uint8_t hdr[] = {
@@ -171,7 +170,7 @@ int wav_start_capture (CaptureState *s, const char *path, int freq,
         goto error_free;
     }
 
-    cap = AUD_add_capture (&as, &ops, wav);
+    cap = AUD_add_capture(state, &as, &ops, wav);
     if (!cap) {
         error_report("Failed to add audio capture");
         goto error_free;

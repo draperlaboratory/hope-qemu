@@ -13,6 +13,8 @@
 #include "trace-root.h"
 #include "qemu/thread.h"
 #include "qemu/main-loop.h"
+#include "sysemu/cpus.h"
+#include "qemu/range.h"
 
 /* #define DEBUG_IOMMU */
 
@@ -28,8 +30,8 @@ int dma_memory_set(AddressSpace *as, dma_addr_t addr, uint8_t c, dma_addr_t len)
     memset(fillbuf, c, FILLBUF_SIZE);
     while (len > 0) {
         l = len < FILLBUF_SIZE ? len : FILLBUF_SIZE;
-        error |= address_space_rw(as, addr, MEMTXATTRS_UNSPECIFIED,
-                                  fillbuf, l, true);
+        error |= address_space_write(as, addr, MEMTXATTRS_UNSPECIFIED,
+                                     fillbuf, l);
         len -= l;
         addr += l;
     }
@@ -90,6 +92,7 @@ static void reschedule_dma(void *opaque)
 {
     DMAAIOCB *dbs = (DMAAIOCB *)opaque;
 
+    assert(!dbs->acb && dbs->bh);
     qemu_bh_delete(dbs->bh);
     dbs->bh = NULL;
     dma_blk_cb(dbs, 0);
@@ -111,15 +114,12 @@ static void dma_complete(DMAAIOCB *dbs, int ret)
 {
     trace_dma_complete(dbs, ret, dbs->common.cb);
 
+    assert(!dbs->acb && !dbs->bh);
     dma_blk_unmap(dbs);
     if (dbs->common.cb) {
         dbs->common.cb(dbs->common.opaque, ret);
     }
     qemu_iovec_destroy(&dbs->iov);
-    if (dbs->bh) {
-        qemu_bh_delete(dbs->bh);
-        dbs->bh = NULL;
-    }
     qemu_aio_unref(dbs);
 }
 
@@ -144,6 +144,26 @@ static void dma_blk_cb(void *opaque, int ret)
         cur_addr = dbs->sg->sg[dbs->sg_cur_index].base + dbs->sg_cur_byte;
         cur_len = dbs->sg->sg[dbs->sg_cur_index].len - dbs->sg_cur_byte;
         mem = dma_memory_map(dbs->sg->as, cur_addr, &cur_len, dbs->dir);
+        /*
+         * Make reads deterministic in icount mode. Windows sometimes issues
+         * disk read requests with overlapping SGs. It leads
+         * to non-determinism, because resulting buffer contents may be mixed
+         * from several sectors. This code splits all SGs into several
+         * groups. SGs in every group do not overlap.
+         */
+        if (mem && use_icount && dbs->dir == DMA_DIRECTION_FROM_DEVICE) {
+            int i;
+            for (i = 0 ; i < dbs->iov.niov ; ++i) {
+                if (ranges_overlap((intptr_t)dbs->iov.iov[i].iov_base,
+                                   dbs->iov.iov[i].iov_len, (intptr_t)mem,
+                                   cur_len)) {
+                    dma_memory_unmap(dbs->sg->as, mem, cur_len,
+                                     dbs->dir, cur_len);
+                    mem = NULL;
+                    break;
+                }
+            }
+        }
         if (!mem)
             break;
         qemu_iovec_add(&dbs->iov, mem, cur_len);
@@ -179,13 +199,20 @@ static void dma_aio_cancel(BlockAIOCB *acb)
 
     trace_dma_aio_cancel(dbs);
 
+    assert(!(dbs->acb && dbs->bh));
     if (dbs->acb) {
+        /* This will invoke dma_blk_cb.  */
         blk_aio_cancel_async(dbs->acb);
+        return;
     }
+
     if (dbs->bh) {
         cpu_unregister_map_client(dbs->bh);
         qemu_bh_delete(dbs->bh);
         dbs->bh = NULL;
+    }
+    if (dbs->common.cb) {
+        dbs->common.cb(dbs->common.opaque, -ECANCELED);
     }
 }
 

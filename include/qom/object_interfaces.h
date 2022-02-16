@@ -57,8 +57,10 @@ typedef struct UserCreatableClass {
  * Wrapper to call complete() method if one of types it's inherited
  * from implements USER_CREATABLE interface, otherwise the call does
  * nothing.
+ *
+ * Returns: %true on success, %false on failure.
  */
-void user_creatable_complete(UserCreatable *uc, Error **errp);
+bool user_creatable_complete(UserCreatable *uc, Error **errp);
 
 /**
  * user_creatable_can_be_deleted:
@@ -86,6 +88,24 @@ bool user_creatable_can_be_deleted(UserCreatable *uc);
 Object *user_creatable_add_type(const char *type, const char *id,
                                 const QDict *qdict,
                                 Visitor *v, Error **errp);
+
+/**
+ * user_creatable_add_dict:
+ * @qdict: the object definition
+ * @keyval: if true, use a keyval visitor for processing @qdict (i.e.
+ *          assume that all @qdict values are strings); otherwise, use
+ *          the normal QObject visitor (i.e. assume all @qdict values
+ *          have the QType expected by the QOM object type)
+ * @errp: if an error occurs, a pointer to an area to store the error
+ *
+ * Create an instance of the user creatable object that is defined by
+ * @qdict.  The object type is taken from the QDict key 'qom-type', its
+ * ID from the key 'id'. The remaining entries in @qdict are used to
+ * initialize the object properties.
+ *
+ * Returns: %true on success, %false on failure.
+ */
+bool user_creatable_add_dict(QDict *qdict, bool keyval, Error **errp);
 
 /**
  * user_creatable_add_opts:
@@ -133,14 +153,28 @@ int user_creatable_add_opts_foreach(void *opaque,
                                     QemuOpts *opts, Error **errp);
 
 /**
+ * user_creatable_print_help:
+ * @type: the QOM type to be added
+ * @opts: options to create
+ *
+ * Prints help if requested in @opts.
+ *
+ * Returns: true if @opts contained a help option and help was printed, false
+ * if no help option was found.
+ */
+bool user_creatable_print_help(const char *type, QemuOpts *opts);
+
+/**
  * user_creatable_del:
  * @id: the unique ID for the object
  * @errp: if an error occurs, a pointer to an area to store the error
  *
  * Delete an instance of the user creatable object identified
  * by @id.
+ *
+ * Returns: %true on success, %false on failure.
  */
-void user_creatable_del(const char *id, Error **errp);
+bool user_creatable_del(const char *id, Error **errp);
 
 /**
  * user_creatable_cleanup:
@@ -149,5 +183,12 @@ void user_creatable_del(const char *id, Error **errp);
  * objects container.
  */
 void user_creatable_cleanup(void);
+
+/**
+ * qmp_object_add:
+ *
+ * QMP command handler for object-add. See the QAPI schema for documentation.
+ */
+void qmp_object_add(QDict *qdict, QObject **ret_data, Error **errp);
 
 #endif

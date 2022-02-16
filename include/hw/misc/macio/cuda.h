@@ -26,6 +26,8 @@
 #ifndef CUDA_H
 #define CUDA_H
 
+#include "hw/misc/mos6522.h"
+
 /* CUDA commands (2nd byte) */
 #define CUDA_WARM_START                0x0
 #define CUDA_AUTOPOLL                  0x1
@@ -93,12 +95,8 @@ typedef struct CUDAState {
     int data_out_index;
 
     qemu_irq irq;
-    uint16_t adb_poll_mask;
-    uint8_t autopoll_rate_ms;
-    uint8_t autopoll;
     uint8_t data_in[128];
     uint8_t data_out[16];
-    QEMUTimer *adb_poll_timer;
 } CUDAState;
 
 #endif /* CUDA_H */

@@ -10,7 +10,7 @@
  * See the COPYING file in the top-level directory for details.
  */
 
-#include "tcg-pool.inc.c"
+#include "../tcg-pool.inc.c"
 #include "qemu/bitops.h"
 
 /* We're going to re-use TCGType in setting of the SF bit, which controls
@@ -557,6 +557,7 @@ typedef enum {
     I3614_SSHR      = 0x0f000400,
     I3614_SSRA      = 0x0f001400,
     I3614_SHL       = 0x0f005400,
+    I3614_SLI       = 0x2f005400,
     I3614_USHR      = 0x2f000400,
     I3614_USRA      = 0x2f001400,
 
@@ -1423,7 +1424,7 @@ static inline void tcg_out_rev16(TCGContext *s, TCGReg rd, TCGReg rn)
     tcg_out_insn(s, 3507, REV16, TCG_TYPE_I32, rd, rn);
 }
 
-static inline void tcg_out_sxt(TCGContext *s, TCGType ext, TCGMemOp s_bits,
+static inline void tcg_out_sxt(TCGContext *s, TCGType ext, MemOp s_bits,
                                TCGReg rd, TCGReg rn)
 {
     /* Using ALIASes SXTB, SXTH, SXTW, of SBFM Xd, Xn, #0, #7|15|31 */
@@ -1431,7 +1432,7 @@ static inline void tcg_out_sxt(TCGContext *s, TCGType ext, TCGMemOp s_bits,
     tcg_out_sbfm(s, ext, rd, rn, 0, bits);
 }
 
-static inline void tcg_out_uxt(TCGContext *s, TCGMemOp s_bits,
+static inline void tcg_out_uxt(TCGContext *s, MemOp s_bits,
                                TCGReg rd, TCGReg rn)
 {
     /* Using ALIASes UXTB, UXTH of UBFM Wd, Wn, #0, #7|15 */
@@ -1541,7 +1542,7 @@ static void tcg_out_cltz(TCGContext *s, TCGType ext, TCGReg d,
 }
 
 #ifdef CONFIG_SOFTMMU
-#include "tcg-ldst.inc.c"
+#include "../tcg-ldst.inc.c"
 
 /* helper signature: helper_ret_ld_mmu(CPUState *env, target_ulong addr,
  *                                     TCGMemOpIdx oi, uintptr_t ra)
@@ -1580,8 +1581,8 @@ static inline void tcg_out_adr(TCGContext *s, TCGReg rd, void *target)
 static bool tcg_out_qemu_ld_slow_path(TCGContext *s, TCGLabelQemuLdst *lb)
 {
     TCGMemOpIdx oi = lb->oi;
-    TCGMemOp opc = get_memop(oi);
-    TCGMemOp size = opc & MO_SIZE;
+    MemOp opc = get_memop(oi);
+    MemOp size = opc & MO_SIZE;
 
     if (!reloc_pc19(lb->label_ptr[0], s->code_ptr)) {
         return false;
@@ -1605,8 +1606,8 @@ static bool tcg_out_qemu_ld_slow_path(TCGContext *s, TCGLabelQemuLdst *lb)
 static bool tcg_out_qemu_st_slow_path(TCGContext *s, TCGLabelQemuLdst *lb)
 {
     TCGMemOpIdx oi = lb->oi;
-    TCGMemOp opc = get_memop(oi);
-    TCGMemOp size = opc & MO_SIZE;
+    MemOp opc = get_memop(oi);
+    MemOp size = opc & MO_SIZE;
 
     if (!reloc_pc19(lb->label_ptr[0], s->code_ptr)) {
         return false;
@@ -1649,7 +1650,7 @@ QEMU_BUILD_BUG_ON(offsetof(CPUTLBDescFast, table) != 8);
    slow path for the failure case, which will be patched later when finalizing
    the slow path. Generated code returns the host addend in X1,
    clobbers X0,X2,X3,TMP. */
-static void tcg_out_tlb_read(TCGContext *s, TCGReg addr_reg, TCGMemOp opc,
+static void tcg_out_tlb_read(TCGContext *s, TCGReg addr_reg, MemOp opc,
                              tcg_insn_unit **label_ptr, int mem_index,
                              bool is_read)
 {
@@ -1709,11 +1710,11 @@ static void tcg_out_tlb_read(TCGContext *s, TCGReg addr_reg, TCGMemOp opc,
 
 #endif /* CONFIG_SOFTMMU */
 
-static void tcg_out_qemu_ld_direct(TCGContext *s, TCGMemOp memop, TCGType ext,
+static void tcg_out_qemu_ld_direct(TCGContext *s, MemOp memop, TCGType ext,
                                    TCGReg data_r, TCGReg addr_r,
                                    TCGType otype, TCGReg off_r)
 {
-    const TCGMemOp bswap = memop & MO_BSWAP;
+    const MemOp bswap = memop & MO_BSWAP;
 
     switch (memop & MO_SSIZE) {
     case MO_UB:
@@ -1765,11 +1766,11 @@ static void tcg_out_qemu_ld_direct(TCGContext *s, TCGMemOp memop, TCGType ext,
     }
 }
 
-static void tcg_out_qemu_st_direct(TCGContext *s, TCGMemOp memop,
+static void tcg_out_qemu_st_direct(TCGContext *s, MemOp memop,
                                    TCGReg data_r, TCGReg addr_r,
                                    TCGType otype, TCGReg off_r)
 {
-    const TCGMemOp bswap = memop & MO_BSWAP;
+    const MemOp bswap = memop & MO_BSWAP;
 
     switch (memop & MO_SIZE) {
     case MO_8:
@@ -1804,7 +1805,7 @@ static void tcg_out_qemu_st_direct(TCGContext *s, TCGMemOp memop,
 static void tcg_out_qemu_ld(TCGContext *s, TCGReg data_reg, TCGReg addr_reg,
                             TCGMemOpIdx oi, TCGType ext)
 {
-    TCGMemOp memop = get_memop(oi);
+    MemOp memop = get_memop(oi);
     const TCGType otype = TARGET_LONG_BITS == 64 ? TCG_TYPE_I64 : TCG_TYPE_I32;
 #ifdef CONFIG_SOFTMMU
     unsigned mem_index = get_mmuidx(oi);
@@ -1829,7 +1830,7 @@ static void tcg_out_qemu_ld(TCGContext *s, TCGReg data_reg, TCGReg addr_reg,
 static void tcg_out_qemu_st(TCGContext *s, TCGReg data_reg, TCGReg addr_reg,
                             TCGMemOpIdx oi)
 {
-    TCGMemOp memop = get_memop(oi);
+    MemOp memop = get_memop(oi);
     const TCGType otype = TARGET_LONG_BITS == 64 ? TCG_TYPE_I64 : TCG_TYPE_I32;
 #ifdef CONFIG_SOFTMMU
     unsigned mem_index = get_mmuidx(oi);
@@ -2411,6 +2412,9 @@ static void tcg_out_vec_op(TCGContext *s, TCGOpcode opc,
     case INDEX_op_sari_vec:
         tcg_out_insn(s, 3614, SSHR, is_q, a0, a1, (16 << vece) - a2);
         break;
+    case INDEX_op_aa64_sli_vec:
+        tcg_out_insn(s, 3614, SLI, is_q, a0, a2, args[3] + (8 << vece));
+        break;
     case INDEX_op_shlv_vec:
         tcg_out_insn(s, 3616, USHL, is_q, vece, a0, a1, a2);
         break;
@@ -2498,8 +2502,11 @@ int tcg_can_emit_vec_op(TCGOpcode opc, TCGType type, unsigned vece)
     case INDEX_op_shlv_vec:
     case INDEX_op_bitsel_vec:
         return 1;
+    case INDEX_op_rotli_vec:
     case INDEX_op_shrv_vec:
     case INDEX_op_sarv_vec:
+    case INDEX_op_rotlv_vec:
+    case INDEX_op_rotrv_vec:
         return -1;
     case INDEX_op_mul_vec:
     case INDEX_op_smax_vec:
@@ -2517,14 +2524,24 @@ void tcg_expand_vec_op(TCGOpcode opc, TCGType type, unsigned vece,
                        TCGArg a0, ...)
 {
     va_list va;
-    TCGv_vec v0, v1, v2, t1;
+    TCGv_vec v0, v1, v2, t1, t2;
+    TCGArg a2;
 
     va_start(va, a0);
     v0 = temp_tcgv_vec(arg_temp(a0));
     v1 = temp_tcgv_vec(arg_temp(va_arg(va, TCGArg)));
-    v2 = temp_tcgv_vec(arg_temp(va_arg(va, TCGArg)));
+    a2 = va_arg(va, TCGArg);
+    v2 = temp_tcgv_vec(arg_temp(a2));
 
     switch (opc) {
+    case INDEX_op_rotli_vec:
+        t1 = tcg_temp_new_vec(type);
+        tcg_gen_shri_vec(vece, t1, v1, -a2 & ((8 << vece) - 1));
+        vec_gen_4(INDEX_op_aa64_sli_vec, type, vece,
+                  tcgv_vec_arg(v0), tcgv_vec_arg(t1), tcgv_vec_arg(v1), a2);
+        tcg_temp_free_vec(t1);
+        break;
+
     case INDEX_op_shrv_vec:
     case INDEX_op_sarv_vec:
         /* Right shifts are negative left shifts for AArch64.  */
@@ -2535,6 +2552,35 @@ void tcg_expand_vec_op(TCGOpcode opc, TCGType type, unsigned vece,
         vec_gen_3(opc, type, vece, tcgv_vec_arg(v0),
                   tcgv_vec_arg(v1), tcgv_vec_arg(t1));
         tcg_temp_free_vec(t1);
+        break;
+
+    case INDEX_op_rotlv_vec:
+        t1 = tcg_temp_new_vec(type);
+        tcg_gen_dupi_vec(vece, t1, 8 << vece);
+        tcg_gen_sub_vec(vece, t1, v2, t1);
+        /* Right shifts are negative left shifts for AArch64.  */
+        vec_gen_3(INDEX_op_shlv_vec, type, vece, tcgv_vec_arg(t1),
+                  tcgv_vec_arg(v1), tcgv_vec_arg(t1));
+        vec_gen_3(INDEX_op_shlv_vec, type, vece, tcgv_vec_arg(v0),
+                  tcgv_vec_arg(v1), tcgv_vec_arg(v2));
+        tcg_gen_or_vec(vece, v0, v0, t1);
+        tcg_temp_free_vec(t1);
+        break;
+
+    case INDEX_op_rotrv_vec:
+        t1 = tcg_temp_new_vec(type);
+        t2 = tcg_temp_new_vec(type);
+        tcg_gen_neg_vec(vece, t1, v2);
+        tcg_gen_dupi_vec(vece, t2, 8 << vece);
+        tcg_gen_add_vec(vece, t2, t1, t2);
+        /* Right shifts are negative left shifts for AArch64.  */
+        vec_gen_3(INDEX_op_shlv_vec, type, vece, tcgv_vec_arg(t1),
+                  tcgv_vec_arg(v1), tcgv_vec_arg(t1));
+        vec_gen_3(INDEX_op_shlv_vec, type, vece, tcgv_vec_arg(t2),
+                  tcgv_vec_arg(v1), tcgv_vec_arg(t2));
+        tcg_gen_or_vec(vece, v0, t1, t2);
+        tcg_temp_free_vec(t1);
+        tcg_temp_free_vec(t2);
         break;
 
     default:
@@ -2557,6 +2603,7 @@ static const TCGTargetOpDef *tcg_target_op_def(TCGOpcode op)
     static const TCGTargetOpDef lZ_l = { .args_ct_str = { "lZ", "l" } };
     static const TCGTargetOpDef r_r_r = { .args_ct_str = { "r", "r", "r" } };
     static const TCGTargetOpDef w_w_w = { .args_ct_str = { "w", "w", "w" } };
+    static const TCGTargetOpDef w_0_w = { .args_ct_str = { "w", "0", "w" } };
     static const TCGTargetOpDef w_w_wO = { .args_ct_str = { "w", "w", "wO" } };
     static const TCGTargetOpDef w_w_wN = { .args_ct_str = { "w", "w", "wN" } };
     static const TCGTargetOpDef w_w_wZ = { .args_ct_str = { "w", "w", "wZ" } };
@@ -2751,6 +2798,8 @@ static const TCGTargetOpDef *tcg_target_op_def(TCGOpcode op)
         return &w_w_wZ;
     case INDEX_op_bitsel_vec:
         return &w_w_w_w;
+    case INDEX_op_aa64_sli_vec:
+        return &w_0_w;
 
     default:
         return NULL;

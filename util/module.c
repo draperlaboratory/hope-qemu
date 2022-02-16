@@ -19,6 +19,9 @@
 #endif
 #include "qemu/queue.h"
 #include "qemu/module.h"
+#ifdef CONFIG_MODULE_UPGRADES
+#include "qemu-version.h"
+#endif
 
 typedef struct ModuleEntry
 {
@@ -30,6 +33,7 @@ typedef struct ModuleEntry
 typedef QTAILQ_HEAD(, ModuleEntry) ModuleTypeList;
 
 static ModuleTypeList init_type_list[MODULE_INIT_MAX];
+static bool modules_init_done[MODULE_INIT_MAX];
 
 static ModuleTypeList dso_init_list;
 
@@ -91,11 +95,17 @@ void module_call_init(module_init_type type)
     ModuleTypeList *l;
     ModuleEntry *e;
 
+    if (modules_init_done[type]) {
+        return;
+    }
+
     l = find_type(type);
 
     QTAILQ_FOREACH(e, l, node) {
         e->init();
     }
+
+    modules_init_done[type] = true;
 }
 
 #ifdef CONFIG_MODULES
@@ -156,13 +166,18 @@ out:
 }
 #endif
 
-void module_load_one(const char *prefix, const char *lib_name)
+bool module_load_one(const char *prefix, const char *lib_name)
 {
+    bool success = false;
+
 #ifdef CONFIG_MODULES
     char *fname = NULL;
     char *exec_dir;
+#ifdef CONFIG_MODULE_UPGRADES
+    char *version_dir;
+#endif
     const char *search_dir;
-    char *dirs[4];
+    char *dirs[5];
     char *module_name;
     int i = 0, n_dirs = 0;
     int ret;
@@ -170,7 +185,7 @@ void module_load_one(const char *prefix, const char *lib_name)
 
     if (!g_module_supported()) {
         fprintf(stderr, "Module is not supported by system.\n");
-        return;
+        return false;
     }
 
     if (!loaded_modules) {
@@ -179,11 +194,10 @@ void module_load_one(const char *prefix, const char *lib_name)
 
     module_name = g_strdup_printf("%s%s", prefix, lib_name);
 
-    if (g_hash_table_lookup(loaded_modules, module_name)) {
+    if (!g_hash_table_add(loaded_modules, module_name)) {
         g_free(module_name);
-        return;
+        return true;
     }
-    g_hash_table_insert(loaded_modules, module_name, module_name);
 
     exec_dir = qemu_get_exec_dir();
     search_dir = getenv("QEMU_MODULE_DIR");
@@ -193,6 +207,14 @@ void module_load_one(const char *prefix, const char *lib_name)
     dirs[n_dirs++] = g_strdup_printf("%s", CONFIG_QEMU_MODDIR);
     dirs[n_dirs++] = g_strdup_printf("%s/..", exec_dir ? : "");
     dirs[n_dirs++] = g_strdup_printf("%s", exec_dir ? : "");
+
+#ifdef CONFIG_MODULE_UPGRADES
+    version_dir = g_strcanon(g_strdup(QEMU_PKGVERSION),
+                             G_CSET_A_2_Z G_CSET_a_2_z G_CSET_DIGITS "+-.~",
+                             '_');
+    dirs[n_dirs++] = g_strdup_printf("/var/run/qemu/%s", version_dir);
+#endif
+
     assert(n_dirs <= ARRAY_SIZE(dirs));
 
     g_free(exec_dir);
@@ -206,8 +228,14 @@ void module_load_one(const char *prefix, const char *lib_name)
         fname = NULL;
         /* Try loading until loaded a module file */
         if (!ret) {
+            success = true;
             break;
         }
+    }
+
+    if (!success) {
+        g_hash_table_remove(loaded_modules, module_name);
+        g_free(module_name);
     }
 
     for (i = 0; i < n_dirs; i++) {
@@ -215,4 +243,69 @@ void module_load_one(const char *prefix, const char *lib_name)
     }
 
 #endif
+    return success;
+}
+
+/*
+ * Building devices and other qom objects modular is mostly useful in
+ * case they have dependencies to external shared libraries, so we can
+ * cut down the core qemu library dependencies.  Which is the case for
+ * only a very few devices & objects.
+ *
+ * So with the expectation that this will be rather the exception than
+ * to rule and the list will not gain that many entries go with a
+ * simple manually maintained list for now.
+ */
+static struct {
+    const char *type;
+    const char *prefix;
+    const char *module;
+} const qom_modules[] = {
+    { "ccid-card-passthru",    "hw-", "usb-smartcard"         },
+    { "ccid-card-emulated",    "hw-", "usb-smartcard"         },
+    { "usb-redir",             "hw-", "usb-redirect"          },
+    { "qxl-vga",               "hw-", "display-qxl"           },
+    { "qxl",                   "hw-", "display-qxl"           },
+    { "chardev-braille",       "chardev-", "baum"             },
+};
+
+static bool module_loaded_qom_all;
+
+void module_load_qom_one(const char *type)
+{
+    int i;
+
+    if (!type) {
+        return;
+    }
+    if (module_loaded_qom_all) {
+        return;
+    }
+    for (i = 0; i < ARRAY_SIZE(qom_modules); i++) {
+        if (strcmp(qom_modules[i].type, type) == 0) {
+            module_load_one(qom_modules[i].prefix,
+                            qom_modules[i].module);
+            return;
+        }
+    }
+}
+
+void module_load_qom_all(void)
+{
+    int i;
+
+    if (module_loaded_qom_all) {
+        return;
+    }
+    for (i = 0; i < ARRAY_SIZE(qom_modules); i++) {
+        if (i > 0 && (strcmp(qom_modules[i - 1].module,
+                             qom_modules[i].module) == 0 &&
+                      strcmp(qom_modules[i - 1].prefix,
+                             qom_modules[i].prefix) == 0)) {
+            /* one module implementing multiple types -> load only once */
+            continue;
+        }
+        module_load_one(qom_modules[i].prefix, qom_modules[i].module);
+    }
+    module_loaded_qom_all = true;
 }

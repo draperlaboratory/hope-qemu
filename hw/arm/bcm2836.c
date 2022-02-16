@@ -5,7 +5,8 @@
  * Rasperry Pi 2 emulation and refactoring Copyright (c) 2015, Microsoft
  * Written by Andrew Baumann
  *
- * This code is licensed under the GNU GPLv2 and later.
+ * This work is licensed under the terms of the GNU GPL, version 2 or later.
+ * See the COPYING file in the top-level directory.
  */
 
 #include "qemu/osdep.h"
@@ -16,15 +17,11 @@
 #include "hw/arm/raspi_platform.h"
 #include "hw/sysbus.h"
 
-/* Peripheral base address seen by the CPU */
-#define BCM2836_PERI_BASE       0x3F000000
-
-/* "QA7" (Pi2) interrupt controller and mailboxes etc. */
-#define BCM2836_CONTROL_BASE    0x40000000
-
 struct BCM283XInfo {
     const char *name;
     const char *cpu_type;
+    hwaddr peri_base; /* Peripheral base address seen by the CPU */
+    hwaddr ctrl_base; /* Interrupt controller and mailboxes etc. */
     int clusterid;
 };
 
@@ -32,12 +29,16 @@ static const BCM283XInfo bcm283x_socs[] = {
     {
         .name = TYPE_BCM2836,
         .cpu_type = ARM_CPU_TYPE_NAME("cortex-a7"),
+        .peri_base = 0x3f000000,
+        .ctrl_base = 0x40000000,
         .clusterid = 0xf,
     },
 #ifdef TARGET_AARCH64
     {
         .name = TYPE_BCM2837,
         .cpu_type = ARM_CPU_TYPE_NAME("cortex-a53"),
+        .peri_base = 0x3f000000,
+        .ctrl_base = 0x40000000,
         .clusterid = 0x0,
     },
 #endif
@@ -51,19 +52,18 @@ static void bcm2836_init(Object *obj)
     int n;
 
     for (n = 0; n < BCM283X_NCPUS; n++) {
-        object_initialize_child(obj, "cpu[*]", &s->cpus[n], sizeof(s->cpus[n]),
-                                info->cpu_type, &error_abort, NULL);
+        object_initialize_child(obj, "cpu[*]", &s->cpu[n].core,
+                                info->cpu_type);
     }
 
-    sysbus_init_child_obj(obj, "control", &s->control, sizeof(s->control),
-                          TYPE_BCM2836_CONTROL);
+    object_initialize_child(obj, "control", &s->control, TYPE_BCM2836_CONTROL);
 
-    sysbus_init_child_obj(obj, "peripherals", &s->peripherals,
-                          sizeof(s->peripherals), TYPE_BCM2835_PERIPHERALS);
+    object_initialize_child(obj, "peripherals", &s->peripherals,
+                            TYPE_BCM2835_PERIPHERALS);
     object_property_add_alias(obj, "board-rev", OBJECT(&s->peripherals),
-                              "board-rev", &error_abort);
+                              "board-rev");
     object_property_add_alias(obj, "vcram-size", OBJECT(&s->peripherals),
-                              "vcram-size", &error_abort);
+                              "vcram-size");
 }
 
 static void bcm2836_realize(DeviceState *dev, Error **errp)
@@ -72,48 +72,30 @@ static void bcm2836_realize(DeviceState *dev, Error **errp)
     BCM283XClass *bc = BCM283X_GET_CLASS(dev);
     const BCM283XInfo *info = bc->info;
     Object *obj;
-    Error *err = NULL;
     int n;
 
     /* common peripherals from bcm2835 */
 
-    obj = object_property_get_link(OBJECT(dev), "ram", &err);
-    if (obj == NULL) {
-        error_setg(errp, "%s: required ram link not found: %s",
-                   __func__, error_get_pretty(err));
-        return;
-    }
+    obj = object_property_get_link(OBJECT(dev), "ram", &error_abort);
 
-    object_property_add_const_link(OBJECT(&s->peripherals), "ram", obj, &err);
-    if (err) {
-        error_propagate(errp, err);
-        return;
-    }
+    object_property_add_const_link(OBJECT(&s->peripherals), "ram", obj);
 
-    object_property_set_bool(OBJECT(&s->peripherals), true, "realized", &err);
-    if (err) {
-        error_propagate(errp, err);
+    if (!sysbus_realize(SYS_BUS_DEVICE(&s->peripherals), errp)) {
         return;
     }
 
     object_property_add_alias(OBJECT(s), "sd-bus", OBJECT(&s->peripherals),
-                              "sd-bus", &err);
-    if (err) {
-        error_propagate(errp, err);
-        return;
-    }
+                              "sd-bus");
 
     sysbus_mmio_map_overlap(SYS_BUS_DEVICE(&s->peripherals), 0,
-                            BCM2836_PERI_BASE, 1);
+                            info->peri_base, 1);
 
     /* bcm2836 interrupt controller (and mailboxes, etc.) */
-    object_property_set_bool(OBJECT(&s->control), true, "realized", &err);
-    if (err) {
-        error_propagate(errp, err);
+    if (!sysbus_realize(SYS_BUS_DEVICE(&s->control), errp)) {
         return;
     }
 
-    sysbus_mmio_map(SYS_BUS_DEVICE(&s->control), 0, BCM2836_CONTROL_BASE);
+    sysbus_mmio_map(SYS_BUS_DEVICE(&s->control), 0, info->ctrl_base);
 
     sysbus_connect_irq(SYS_BUS_DEVICE(&s->peripherals), 0,
         qdev_get_gpio_in_named(DEVICE(&s->control), "gpu-irq", 0));
@@ -122,45 +104,40 @@ static void bcm2836_realize(DeviceState *dev, Error **errp)
 
     for (n = 0; n < BCM283X_NCPUS; n++) {
         /* TODO: this should be converted to a property of ARM_CPU */
-        s->cpus[n].mp_affinity = (info->clusterid << 8) | n;
+        s->cpu[n].core.mp_affinity = (info->clusterid << 8) | n;
 
         /* set periphbase/CBAR value for CPU-local registers */
-        object_property_set_int(OBJECT(&s->cpus[n]),
-                                BCM2836_PERI_BASE + MCORE_OFFSET,
-                                "reset-cbar", &err);
-        if (err) {
-            error_propagate(errp, err);
+        if (!object_property_set_int(OBJECT(&s->cpu[n].core), "reset-cbar",
+                                     info->peri_base, errp)) {
             return;
         }
 
         /* start powered off if not enabled */
-        object_property_set_bool(OBJECT(&s->cpus[n]), n >= s->enabled_cpus,
-                                 "start-powered-off", &err);
-        if (err) {
-            error_propagate(errp, err);
+        if (!object_property_set_bool(OBJECT(&s->cpu[n].core),
+                                      "start-powered-off",
+                                      n >= s->enabled_cpus,
+                                      errp)) {
             return;
         }
 
-        object_property_set_bool(OBJECT(&s->cpus[n]), true, "realized", &err);
-        if (err) {
-            error_propagate(errp, err);
+        if (!qdev_realize(DEVICE(&s->cpu[n].core), NULL, errp)) {
             return;
         }
 
         /* Connect irq/fiq outputs from the interrupt controller. */
         qdev_connect_gpio_out_named(DEVICE(&s->control), "irq", n,
-                qdev_get_gpio_in(DEVICE(&s->cpus[n]), ARM_CPU_IRQ));
+                qdev_get_gpio_in(DEVICE(&s->cpu[n].core), ARM_CPU_IRQ));
         qdev_connect_gpio_out_named(DEVICE(&s->control), "fiq", n,
-                qdev_get_gpio_in(DEVICE(&s->cpus[n]), ARM_CPU_FIQ));
+                qdev_get_gpio_in(DEVICE(&s->cpu[n].core), ARM_CPU_FIQ));
 
         /* Connect timers from the CPU to the interrupt controller */
-        qdev_connect_gpio_out(DEVICE(&s->cpus[n]), GTIMER_PHYS,
+        qdev_connect_gpio_out(DEVICE(&s->cpu[n].core), GTIMER_PHYS,
                 qdev_get_gpio_in_named(DEVICE(&s->control), "cntpnsirq", n));
-        qdev_connect_gpio_out(DEVICE(&s->cpus[n]), GTIMER_VIRT,
+        qdev_connect_gpio_out(DEVICE(&s->cpu[n].core), GTIMER_VIRT,
                 qdev_get_gpio_in_named(DEVICE(&s->control), "cntvirq", n));
-        qdev_connect_gpio_out(DEVICE(&s->cpus[n]), GTIMER_HYP,
+        qdev_connect_gpio_out(DEVICE(&s->cpu[n].core), GTIMER_HYP,
                 qdev_get_gpio_in_named(DEVICE(&s->control), "cnthpirq", n));
-        qdev_connect_gpio_out(DEVICE(&s->cpus[n]), GTIMER_SEC,
+        qdev_connect_gpio_out(DEVICE(&s->cpu[n].core), GTIMER_SEC,
                 qdev_get_gpio_in_named(DEVICE(&s->control), "cntpsirq", n));
     }
 }
@@ -178,7 +155,7 @@ static void bcm283x_class_init(ObjectClass *oc, void *data)
 
     bc->info = data;
     dc->realize = bcm2836_realize;
-    dc->props = bcm2836_props;
+    device_class_set_props(dc, bcm2836_props);
     /* Reason: Must be wired up in code (see raspi_init() function) */
     dc->user_creatable = false;
 }

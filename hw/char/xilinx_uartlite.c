@@ -23,6 +23,9 @@
  */
 
 #include "qemu/osdep.h"
+#include "qemu/log.h"
+#include "hw/irq.h"
+#include "hw/qdev-properties.h"
 #include "hw/sysbus.h"
 #include "qemu/module.h"
 #include "chardev/char-fe.h"
@@ -132,7 +135,8 @@ uart_write(void *opaque, hwaddr addr,
     switch (addr)
     {
         case R_STATUS:
-            hw_error("write to UART STATUS?\n");
+            qemu_log_mask(LOG_GUEST_ERROR, "%s: write to UART STATUS\n",
+                          __func__);
             break;
 
         case R_CTRL:
@@ -203,7 +207,7 @@ static int uart_can_rx(void *opaque)
     return s->rx_fifo_len < sizeof(s->rx_fifo);
 }
 
-static void uart_event(void *opaque, int event)
+static void uart_event(void *opaque, QEMUChrEvent event)
 {
 
 }
@@ -233,7 +237,7 @@ static void xilinx_uartlite_class_init(ObjectClass *klass, void *data)
 
     dc->reset = xilinx_uartlite_reset;
     dc->realize = xilinx_uartlite_realize;
-    dc->props = xilinx_uartlite_properties;
+    device_class_set_props(dc, xilinx_uartlite_properties);
 }
 
 static const TypeInfo xilinx_uartlite_info = {

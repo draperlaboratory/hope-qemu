@@ -12,7 +12,9 @@
 
 #include "qemu/osdep.h"
 #include "hw/sysbus.h"
-#include "hw/hw.h"
+#include "migration/vmstate.h"
+#include "hw/irq.h"
+#include "hw/qdev-properties.h"
 #include "hw/audio/wm8750.h"
 #include "audio/audio.h"
 #include "qapi/error.h"
@@ -257,7 +259,7 @@ static void mv88w8618_audio_init(Object *obj)
     object_property_add_link(OBJECT(dev), "wm8750", TYPE_WM8750,
                              (Object **) &s->wm,
                              qdev_prop_allow_set_link_before_realize,
-                             0, &error_abort);
+                             0);
 }
 
 static void mv88w8618_audio_realize(DeviceState *dev, Error **errp)
