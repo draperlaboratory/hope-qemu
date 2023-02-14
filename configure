@@ -7422,6 +7422,7 @@ if test "$have_broken_size_max" = "yes" ; then
 fi
 if test "$have_openpty" = "yes" ; then
     echo "HAVE_OPENPTY=y" >> $config_host_mak
+    echo "HAVE_PTY_H=y" >> $config_host_mak
 fi
 if test "$have_sys_signal_h" = "yes" ; then
     echo "HAVE_SYS_SIGNAL_H=y" >> $config_host_mak
