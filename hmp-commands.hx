@@ -1890,7 +1890,7 @@ ERST
     },
 
 SRST
-``reg-mw`` *num&
+``reg-mw`` *num*
   Command to set a watch-point on any change to the metadata for register *num*.
 ERST
 
